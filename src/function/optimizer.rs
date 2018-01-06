@@ -140,5 +140,8 @@ impl Optimizer for Adam {
 
 			*wi = *wi - a * (*mi / (1f64 - b1t)) / ((*vi / (1f64 - b2t)) + EPS).sqrt();
 		}
+
+		self.b1t = b1t * b1;
+		self.b2t = b2t * b2;
 	}
 }
