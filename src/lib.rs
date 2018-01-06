@@ -31,14 +31,26 @@ impl<'a> NNModel<'a> {
 	}
 
 	pub fn with_bias_and_unit_initializer<I,F>(
-												units:Vec<(usize,Option<&'a ActivateF>)>,
+												iunits:usize,
+												units:Vec<(usize,&'a ActivateF)>,
 												reader:I,bias:f64,
 												initializer:F) ->
 		Result<NNModel<'a>, StartupError> where I: InputReader, F: Fn() -> f64 {
 
-		let sunits = units.iter().map(|u| u.0).collect::<Vec<usize>>();
+		match units.len() {
+			l if l < 2 => {
+				return Err(StartupError::InvalidConfiguration(
+					String::from(
+						"Parameter of layer number of intermediate layers of multilayer perceptron is invalid (less than 2)")));
+			}
+			_ => (),
+		}
 
-		NNModel::with_schema(units,reader,move || {
+		let mut sunits = units.iter().map(|u| u.0).collect::<Vec<usize>>();
+		sunits.insert(0, iunits);
+		let sunits = sunits;
+
+		NNModel::with_schema(iunits,units,reader,move || {
 			let mut layers:Vec<Vec<Vec<f64>>> = Vec::with_capacity(sunits.len());
 
 			for i in 0..sunits.len() - 1 {
@@ -65,18 +77,30 @@ impl<'a> NNModel<'a> {
 	}
 
 	pub fn with_list_of_bias_and_unit_initializer<I,F>(
-												units:Vec<(usize,Option<&'a ActivateF>)>,
+												iunits:usize,
+												units:Vec<(usize,&'a ActivateF)>,
 												reader:I,
 												init_list:Vec<(f64,F)>) ->
 		Result<NNModel<'a>, StartupError> where I: InputReader, F: Fn() -> f64 {
+
+		match units.len() {
+			l if l < 2 => {
+				return Err(StartupError::InvalidConfiguration(
+					String::from(
+						"Parameter of layer number of intermediate layers of multilayer perceptron is invalid (less than 2)")));
+			}
+			_ => (),
+		}
 
 		if init_list.len() != units.len() - 1 {
 			return Err(StartupError::InvalidConfiguration(format!("The layers count do not match. (units = {}, count of init_list = {})", units.len(), init_list.len())));
 		}
 
-		let sunits = units.iter().map(|u| u.0).collect::<Vec<usize>>();
+		let mut sunits = units.iter().map(|u| u.0).collect::<Vec<usize>>();
+		sunits.insert(0, iunits);
+		let sunits = sunits;
 
-		NNModel::with_schema(units,reader,move || {
+		NNModel::with_schema(iunits,units,reader,move || {
 			let mut layers:Vec<Vec<Vec<f64>>> = Vec::with_capacity(sunits.len());
 
 			for i in 0..sunits.len() - 1 {
@@ -102,25 +126,25 @@ impl<'a> NNModel<'a> {
 		})
 	}
 
-	pub fn with_schema<I,F>(units:Vec<(usize,Option<&'a ActivateF>)>,mut reader:I,initializer:F) ->
+	pub fn with_schema<I,F>(iunits:usize,units:Vec<(usize,&'a ActivateF)>,mut reader:I,initializer:F) ->
 		Result<NNModel<'a>, StartupError> where I: InputReader, F: Fn() -> Vec<Vec<Vec<f64>>> {
 
 		match units.len() {
-			l if l < 3 => {
+			l if l < 2 => {
 				return Err(StartupError::InvalidConfiguration(
 					String::from(
-						"Parameter of layer number of multilayer perceptron is incorrect (less than 3)")));
+						"Parameter of layer number of intermediate layers of multilayer perceptron is invalid (less than 2)")));
 			}
 			_ => (),
 		}
 
-		match units[0] {
-			(_, Some(_)) => {
-				return Err(StartupError::InvalidConfiguration(
-					String::from("Activation function can not be assign for input layer.")));
-			}
-			_ => (),
-		}
+		let mut units:Vec<(usize,Option<&'a ActivateF>)> = units.iter()
+														.map(|&(u,f)| (u, Some(f)))
+														.collect();
+
+		units.insert(0, (iunits, None));
+
+		let units = units;
 
 		for unit in units.iter().skip(1) {
 			match *unit {
@@ -131,6 +155,7 @@ impl<'a> NNModel<'a> {
 				_ => (),
 			}
 		}
+
 		let layers = match reader.source_exists() {
 			true => {
 				let mut layers:Vec<Vec<Vec<f64>>> = Vec::new();
