@@ -27,11 +27,44 @@ pub struct NNModel<'a> {
 }
 impl<'a> NNModel<'a> {
 	pub fn read_model<I>(mut reader:I) -> Result<NNModel<'a>, StartupError> where I: InputReader {
-
 		reader.read_model()
 	}
 
-	pub fn with_schema_and_initializer<I,F>(units:Vec<(usize,Option<&'a ActivateF>)>,mut reader:I,initializer:F) ->
+	pub fn with_bias_and_unit_initializer<I,F>(
+												units:Vec<(usize,Option<&'a ActivateF>)>,
+												bias:f64,
+												reader:I,initializer:F) ->
+		Result<NNModel<'a>, StartupError> where I: InputReader, F: Fn() -> f64 {
+
+		let sunits = units.iter().map(|u| u.0).collect::<Vec<usize>>();
+
+		NNModel::with_schema(units,reader,move || {
+			let mut layers:Vec<Vec<Vec<f64>>> = Vec::with_capacity(sunits.len());
+
+			for i in 0..sunits.len() - 1 {
+				let mut layer:Vec<Vec<f64>> = Vec::with_capacity(sunits[i]);
+
+				let mut unit:Vec<f64> = Vec::with_capacity(sunits[i+1]);
+
+				unit.resize(sunits[i+1], bias);
+				layer.push(unit);
+
+				for _ in 1..sunits[i] + 1 {
+					let mut unit:Vec<f64> = Vec::with_capacity(sunits[i+1]);
+					for _ in 0..sunits[i+1] {
+						unit.push(initializer());
+					}
+					layer.push(unit);
+				}
+
+				layers.push(layer);
+			}
+
+			layers
+		})
+	}
+
+	pub fn with_schema<I,F>(units:Vec<(usize,Option<&'a ActivateF>)>,mut reader:I,initializer:F) ->
 		Result<NNModel<'a>, StartupError> where I: InputReader, F: Fn() -> Vec<Vec<Vec<f64>>> {
 
 		match units.len() {
