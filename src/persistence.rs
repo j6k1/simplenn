@@ -89,7 +89,7 @@ impl TextFileInputReader {
 		Ok(self.next_token()?.parse::<f64>()?)
 	}
 }
-impl InputReader for TextFileInputReader {
+impl InputReader<StartupError> for TextFileInputReader {
 	fn read_vec(&mut self, units:usize, w:usize) -> Result<Vec<Vec<f64>>, StartupError> {
 		let mut v:Vec<Vec<f64>> = Vec::with_capacity(units);
 
@@ -116,7 +116,7 @@ pub struct PersistenceWithTextFile {
 impl PersistenceWithTextFile {
 	pub fn new(file:String) -> Result<PersistenceWithTextFile,io::Error> {
 		Ok(PersistenceWithTextFile {
-			writer:BufWriter::new(OpenOptions::new().append(true).create(true).open(file)?),
+			writer:BufWriter::new(OpenOptions::new().write(true).create(true).open(file)?),
 		})
 	}
 }

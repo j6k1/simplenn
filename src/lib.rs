@@ -6,6 +6,7 @@ use function::activation::ActivateF;
 use function::loss::LossFunction;
 use function::optimizer::Optimizer;
 use error::*;
+use std::error::Error;
 
 pub struct NN<'a,O,E> where O: Optimizer, E: LossFunction {
 	model:&'a NNModel<'a>,
@@ -27,16 +28,18 @@ pub struct NNModel<'a> {
 	layers:Vec<Vec<Vec<f64>>>,
 }
 impl<'a> NNModel<'a> {
-	pub fn load<I>(mut reader:I) -> Result<NNModel<'a>, StartupError> where I: ModelInputReader {
+	pub fn load<I,E>(mut reader:I) -> Result<NNModel<'a>, E>
+		where I: ModelInputReader<E>, E: Error, StartupError: From<E> {
 		reader.read_model()
 	}
 
-	pub fn with_bias_and_unit_initializer<I,F>(
+	pub fn with_bias_and_unit_initializer<I,F,E>(
 												iunits:usize,
 												units:Vec<(usize,&'a ActivateF)>,
 												reader:I,bias:f64,
 												initializer:F) ->
-		Result<NNModel<'a>, StartupError> where I: InputReader, F: Fn() -> f64 {
+		Result<NNModel<'a>,StartupError>
+		where I: InputReader<E>, F: Fn() -> f64, E: Error, StartupError: From<E> {
 
 		match units.len() {
 			l if l < 2 => {
@@ -77,12 +80,13 @@ impl<'a> NNModel<'a> {
 		})
 	}
 
-	pub fn with_list_of_bias_and_unit_initializer<I,F>(
+	pub fn with_list_of_bias_and_unit_initializer<I,F,E>(
 												iunits:usize,
 												units:Vec<(usize,&'a ActivateF)>,
 												reader:I,
 												init_list:Vec<(f64,F)>) ->
-		Result<NNModel<'a>, StartupError> where I: InputReader, F: Fn() -> f64 {
+		Result<NNModel<'a>,StartupError>
+		where I: InputReader<E>, F: Fn() -> f64, E: Error, StartupError: From<E> {
 
 		match units.len() {
 			l if l < 2 => {
@@ -127,8 +131,9 @@ impl<'a> NNModel<'a> {
 		})
 	}
 
-	pub fn with_schema<I,F>(iunits:usize,units:Vec<(usize,&'a ActivateF)>,mut reader:I,initializer:F) ->
-		Result<NNModel<'a>, StartupError> where I: InputReader, F: Fn() -> Vec<Vec<Vec<f64>>> {
+	pub fn with_schema<I,F,E>(iunits:usize,units:Vec<(usize,&'a ActivateF)>,mut reader:I,initializer:F) ->
+		Result<NNModel<'a>,StartupError>
+		where I: InputReader<E>, F: Fn() -> Vec<Vec<Vec<f64>>>, E: Error, StartupError: From<E> {
 
 		match units.len() {
 			l if l < 2 => {
@@ -197,10 +202,13 @@ impl<'a> NNModel<'a> {
 		})
 	}
 }
-pub trait InputReader {
-	fn read_vec(&mut self,usize,usize) -> Result<Vec<Vec<f64>>,StartupError>;
+pub trait InputReader<E> {
+	fn read_vec(&mut self,usize,usize) -> Result<Vec<Vec<f64>>,E>;
 	fn source_exists(&mut self) -> bool;
 }
-pub trait ModelInputReader {
-	fn read_model<'a>(&mut self) -> Result<NNModel<'a>, StartupError>;
+pub trait ModelInputReader<E> {
+	fn read_model<'a>(&mut self) -> Result<NNModel<'a>, E>;
+}
+pub trait Persistence<E> {
+	fn save(&mut self) -> Result<(),E>;
 }
