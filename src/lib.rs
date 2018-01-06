@@ -146,16 +146,6 @@ impl<'a> NNModel<'a> {
 
 		let units = units;
 
-		for unit in units.iter().skip(1) {
-			match *unit {
-				(_, None) => {
-					return Err(StartupError::InvalidConfiguration(
-						String::from("Activation functions must be specified for all middle tiers.")));
-				}
-				_ => (),
-			}
-		}
-
 		let layers = match reader.source_exists() {
 			true => {
 				let mut layers:Vec<Vec<Vec<f64>>> = Vec::new();
