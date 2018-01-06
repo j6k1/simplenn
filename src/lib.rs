@@ -1,8 +1,10 @@
 pub mod function;
+pub mod error;
 
 use function::activation::ActivateF;
 use function::loss::LossFunction;
 use function::optimizer::Optimizer;
+use error::*;
 
 pub struct NN<'a,O,E> where O: Optimizer + Clone, E: LossFunction {
 	model:&'a NNModel<'a>,
@@ -20,19 +22,96 @@ impl<'a,O,E> NN<'a,O,E> where O: Optimizer, E: LossFunction {
 	}
 }
 pub struct NNModel<'a> {
-	units:Vec<(usize,&'a ActivateF)>,
+	units:Vec<(usize,Option<&'a ActivateF>)>,
 	layers:Vec<Vec<Vec<f64>>>,
 }
 impl<'a> NNModel<'a> {
-	pub fn with_schema_and_initializer<I,F>(units:Vec<(usize,&'a ActivateF)>,reader:I,initializer:F) ->
-		NNModel<'a> where I: InputReader, F: Fn() -> Vec<Vec<Vec<f64>>> {
-		NNModel {
-			units:units,
-			layers:initializer(),
+	pub fn read_model<I>(mut reader:I) -> Result<NNModel<'a>, StartupError> where I: InputReader {
+
+		reader.read_model()
+	}
+
+	pub fn with_schema_and_initializer<I,F>(units:Vec<(usize,Option<&'a ActivateF>)>,mut reader:I,initializer:F) ->
+		Result<NNModel<'a>, StartupError> where I: InputReader, F: Fn() -> Vec<Vec<Vec<f64>>> {
+
+		match units.len() {
+			l if l < 3 => {
+				return Err(StartupError::InvalidConfiguration(
+					String::from(
+						"Parameter of layer number of multilayer perceptron is incorrect (less than 3)")));
+			}
+			_ => (),
 		}
+
+		match units[0] {
+			(_, Some(_)) => {
+				return Err(StartupError::InvalidConfiguration(
+					String::from("Activation function can not be assign for input layer.")));
+			}
+			_ => (),
+		}
+
+		for unit in units.iter().skip(1) {
+			match *unit {
+				(_, None) => {
+					return Err(StartupError::InvalidConfiguration(
+						String::from("Activation functions must be specified for all middle tiers.")));
+				}
+				_ => (),
+			}
+		}
+		let layers = match reader.source_exists() {
+			true => {
+				let mut layers:Vec<Vec<Vec<f64>>> = Vec::new();
+
+				for i in 0..units.len()-1 {
+					let size = match units[i] {
+						(size,_) => size,
+					};
+					let sizeb = match units[i+1] {
+						(size,_) => size,
+					};
+					layers.push(reader.read_vec(size as usize,sizeb as usize)?);
+				}
+				layers
+			},
+			false => initializer(),
+		};
+
+		if layers.len() != units.len() - 1 {
+			return Err(StartupError::InvalidConfiguration(format!("The layers count do not match. (units = {}, layers = {})", units.len(), layers.len())));
+		}
+		else
+		{
+			for i in 0..layers.len() {
+				if units[i].0+1 != layers[i].len()
+				{
+					return Err(StartupError::InvalidConfiguration(format!(
+							"The number of units in Layer {} do not match. (correct size = {}, size = {})",i,units[i].0 + 1,layers[i].len())));
+				}
+
+				for j in 0..units[i].0+1 {
+					match layers[i][j].len() {
+						len if i ==  layers.len() - 1 && len != units[i+1].0 => {
+							return Err(StartupError::InvalidConfiguration(format!(
+								"Weight {} is defined for unit {} in layer {}, but this does not match the number of units in the lower layer.",
+								layers[i][j].len(), i, units[i+1].0
+							)));
+						},
+						_ => (),
+					}
+				}
+			}
+		}
+
+		Ok(NNModel {
+			units:units,
+			layers:layers,
+		})
 	}
 }
 pub trait InputReader {
-	fn read_vec() -> Vec<Vec<f64>>;
-	fn source_exists() -> bool;
+	fn read_vec(&mut self,usize,usize) -> Result<Vec<Vec<f64>>,StartupError>;
+	fn read_model<'a>(&mut self) -> Result<NNModel<'a>, StartupError>;
+	fn source_exists(&mut self) -> bool;
 }

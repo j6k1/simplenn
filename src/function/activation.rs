@@ -1,6 +1,7 @@
 pub trait ActivateF {
 	fn apply(&self,u:f64,v:&Vec<f64>) -> f64;
 	fn derive(&self,e:f64) -> f64;
+	fn kind(&self) -> &str;
 }
 pub struct FIdentity {
 }
@@ -16,6 +17,10 @@ impl ActivateF for FIdentity {
 
 	fn derive(&self,_:f64) -> f64 {
 		1f64
+	}
+
+	fn kind(&self) -> &str {
+		"identity"
 	}
 }
 pub struct FSigmoid {
@@ -36,6 +41,10 @@ impl ActivateF for FSigmoid {
 
 		let e = self.apply(e,&v);
 		e * (1f64 - e)
+	}
+
+	fn kind(&self) -> &str {
+		"sigmoid"
 	}
 }
 pub struct FReLU {
@@ -64,6 +73,10 @@ impl ActivateF for FReLU {
 			_ => 0f64,
 		}
 	}
+
+	fn kind(&self) -> &str {
+		"relu"
+	}
 }
 pub struct FTanh {
 
@@ -82,6 +95,10 @@ impl ActivateF for FTanh {
 		let e = e.tanh();
 		1.0f64 - e * e
 	}
+
+	fn kind(&self) -> &str {
+		"tanh"
+	}
 }
 pub struct SoftMax {
 }
@@ -99,5 +116,9 @@ impl ActivateF for SoftMax {
 
 	fn derive(&self,e:f64) -> f64 {
 		e * (1.0f64 - e)
+	}
+
+	fn kind(&self) -> &str {
+		"softmax"
 	}
 }
