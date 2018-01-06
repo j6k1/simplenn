@@ -32,8 +32,8 @@ impl<'a> NNModel<'a> {
 
 	pub fn with_bias_and_unit_initializer<I,F>(
 												units:Vec<(usize,Option<&'a ActivateF>)>,
-												bias:f64,
-												reader:I,initializer:F) ->
+												reader:I,bias:f64,
+												initializer:F) ->
 		Result<NNModel<'a>, StartupError> where I: InputReader, F: Fn() -> f64 {
 
 		let sunits = units.iter().map(|u| u.0).collect::<Vec<usize>>();
@@ -53,6 +53,44 @@ impl<'a> NNModel<'a> {
 					let mut unit:Vec<f64> = Vec::with_capacity(sunits[i+1]);
 					for _ in 0..sunits[i+1] {
 						unit.push(initializer());
+					}
+					layer.push(unit);
+				}
+
+				layers.push(layer);
+			}
+
+			layers
+		})
+	}
+
+	pub fn with_list_of_bias_and_unit_initializer<I,F>(
+												units:Vec<(usize,Option<&'a ActivateF>)>,
+												reader:I,
+												init_list:Vec<(f64,F)>) ->
+		Result<NNModel<'a>, StartupError> where I: InputReader, F: Fn() -> f64 {
+
+		if init_list.len() != units.len() - 1 {
+			return Err(StartupError::InvalidConfiguration(format!("The layers count do not match. (units = {}, count of init_list = {})", units.len(), init_list.len())));
+		}
+
+		let sunits = units.iter().map(|u| u.0).collect::<Vec<usize>>();
+
+		NNModel::with_schema(units,reader,move || {
+			let mut layers:Vec<Vec<Vec<f64>>> = Vec::with_capacity(sunits.len());
+
+			for i in 0..sunits.len() - 1 {
+				let mut layer:Vec<Vec<f64>> = Vec::with_capacity(sunits[i]);
+
+				let mut unit:Vec<f64> = Vec::with_capacity(sunits[i+1]);
+
+				unit.resize(sunits[i+1], init_list[i].0);
+				layer.push(unit);
+
+				for _ in 1..sunits[i] + 1 {
+					let mut unit:Vec<f64> = Vec::with_capacity(sunits[i+1]);
+					for _ in 0..sunits[i+1] {
+						unit.push(init_list[i].1());
 					}
 					layer.push(unit);
 				}
