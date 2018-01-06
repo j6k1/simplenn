@@ -41,7 +41,7 @@ impl<'a> NNModel<'a> {
 			l if l < 2 => {
 				return Err(StartupError::InvalidConfiguration(
 					String::from(
-						"Parameter of layer number of intermediate layers of multilayer perceptron is invalid (less than 2)")));
+						"Parameter of layer number of middle layers of multilayer perceptron is invalid (less than 2)")));
 			}
 			_ => (),
 		}
@@ -87,7 +87,7 @@ impl<'a> NNModel<'a> {
 			l if l < 2 => {
 				return Err(StartupError::InvalidConfiguration(
 					String::from(
-						"Parameter of layer number of intermediate layers of multilayer perceptron is invalid (less than 2)")));
+						"Parameter of layer number of middle layers of multilayer perceptron is invalid (less than 2)")));
 			}
 			_ => (),
 		}
@@ -133,7 +133,7 @@ impl<'a> NNModel<'a> {
 			l if l < 2 => {
 				return Err(StartupError::InvalidConfiguration(
 					String::from(
-						"Parameter of layer number of intermediate layers of multilayer perceptron is invalid (less than 2)")));
+						"Parameter of layer number of middle layers of multilayer perceptron is invalid (less than 2)")));
 			}
 			_ => (),
 		}
