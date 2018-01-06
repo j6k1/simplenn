@@ -1,5 +1,6 @@
 pub mod function;
 pub mod error;
+pub mod persistence;
 
 use function::activation::ActivateF;
 use function::loss::LossFunction;
