@@ -1,6 +1,4 @@
-use std::clone::Clone;
-
-pub trait Optimizer: Clone {
+pub trait Optimizer {
 	fn update(&mut self,e:&Vec<f64>, w:&mut Vec<f64>);
 }
 pub struct SGD {
@@ -27,14 +25,6 @@ impl Optimizer for SGD {
 		let lambda = self.lambda;
 		for (wi,&ei) in w.iter_mut().zip(e) {
 			*wi = *wi - a * ei + lambda * *wi;
-		}
-	}
-}
-impl Clone for SGD {
-	fn clone(&self) -> SGD {
-		SGD {
-			a:self.a,
-			lambda:self.lambda,
 		}
 	}
 }
@@ -67,14 +57,6 @@ impl Optimizer for Adagrad {
 		}
 	}
 }
-impl Clone for Adagrad {
-	fn clone(&self) ->  Adagrad {
-		Adagrad {
-			a:self.a,
-			gt:Vec::new(),
-		}
-	}
-}
 pub struct RMSprop {
 	a:f64,
 	mu:f64,
@@ -104,15 +86,6 @@ impl Optimizer for RMSprop {
 		for (wi,(gi,&ei)) in w.iter_mut().zip(self.gt.iter_mut().zip(e)) {
 			*gi = mu * *gi + (1f64 - mu) * ei * ei;
 			*wi = *wi - a * ei / (gi.sqrt() + EPS);
-		}
-	}
-}
-impl Clone for RMSprop {
-	fn clone(&self) -> RMSprop {
-		RMSprop {
-			a:0.0001f64,
-			mu:0.9f64,
-			gt:Vec::new(),
 		}
 	}
 }
@@ -166,19 +139,6 @@ impl Optimizer for Adam {
 			*wi = *wi - a * ei / (vi.sqrt() + EPS);
 
 			*wi = *wi - a * (*mi / (1f64 - b1t)) / ((*vi / (1f64 - b2t)) + EPS).sqrt();
-		}
-	}
-}
-impl Clone for Adam {
-	fn clone(&self) -> Adam {
-		Adam {
-			a:0.001f64,
-			mt:Vec::new(),
-			vt:Vec::new(),
-			b1:0.9f64,
-			b2:0.999f64,
-			b1t:0.9f64,
-			b2t:0.999f64,
 		}
 	}
 }

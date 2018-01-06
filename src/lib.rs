@@ -6,17 +6,17 @@ use function::loss::LossFunction;
 use function::optimizer::Optimizer;
 use error::*;
 
-pub struct NN<'a,O,E> where O: Optimizer + Clone, E: LossFunction {
+pub struct NN<'a,O,E> where O: Optimizer, E: LossFunction {
 	model:&'a NNModel<'a>,
 	optimizer:O,
 	lossf:E,
 }
 
 impl<'a,O,E> NN<'a,O,E> where O: Optimizer, E: LossFunction {
-	pub fn new(model:&'a NNModel<'a>,optimizer:O,lossf:E) -> NN<'a,O,E> {
+	pub fn new<F>(model:&'a NNModel<'a>,f:F,lossf:E) -> NN<'a,O,E> where F: Fn() -> O {
 		NN {
 			model:model,
-			optimizer:optimizer,
+			optimizer:f(),
 			lossf:lossf,
 		}
 	}
