@@ -18,7 +18,7 @@ impl fmt::Display for StartupError {
 	 		StartupError::InavalidState(ref s) => write!(f, "{}",s),
 	 		StartupError::ParseFloatError(_) => write!(f, "An error occurred when converting a string to a double value."),
 	 		StartupError::IOError(_) => write!(f,"Error occurred in file I/O."),
-	 		StartupError::Fail(ref e) => write!(f, "User error."),
+	 		StartupError::Fail(_) => write!(f, "User error."),
 	 	}
 	 }
 }
