@@ -26,7 +26,7 @@ pub struct NNModel<'a> {
 	layers:Vec<Vec<Vec<f64>>>,
 }
 impl<'a> NNModel<'a> {
-	pub fn read_model<I>(mut reader:I) -> Result<NNModel<'a>, StartupError> where I: ModelInputReader {
+	pub fn load<I>(mut reader:I) -> Result<NNModel<'a>, StartupError> where I: ModelInputReader {
 		reader.read_model()
 	}
 
