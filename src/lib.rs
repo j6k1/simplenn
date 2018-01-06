@@ -26,7 +26,7 @@ pub struct NNModel<'a> {
 	layers:Vec<Vec<Vec<f64>>>,
 }
 impl<'a> NNModel<'a> {
-	pub fn read_model<I>(mut reader:I) -> Result<NNModel<'a>, StartupError> where I: InputReader {
+	pub fn read_model<I>(mut reader:I) -> Result<NNModel<'a>, StartupError> where I: ModelInputReader {
 		reader.read_model()
 	}
 
@@ -183,6 +183,8 @@ impl<'a> NNModel<'a> {
 }
 pub trait InputReader {
 	fn read_vec(&mut self,usize,usize) -> Result<Vec<Vec<f64>>,StartupError>;
-	fn read_model<'a>(&mut self) -> Result<NNModel<'a>, StartupError>;
 	fn source_exists(&mut self) -> bool;
+}
+pub trait ModelInputReader {
+	fn read_model<'a>(&mut self) -> Result<NNModel<'a>, StartupError>;
 }
