@@ -222,8 +222,8 @@ impl<'a> NNModel<'a> {
 		))
 	}
 
-	pub fn promise_of_learn<O,E,F>(&self,input:Vec<f64>) ->
-		Result<SnapShot,InvalidStateError> {
+	pub fn apply<F,R>(&self,input:Vec<f64>,after_callback:F) -> Result<R,InvalidStateError>
+		where F: Fn(Vec<f64>,Vec<Vec<f64>>,Vec<Vec<f64>>) -> Result<R,InvalidStateError> {
 
 		if input.len() != self.units.len() {
 			return Err(InvalidStateError::InvalidInput(String::from(
@@ -327,7 +327,13 @@ impl<'a> NNModel<'a> {
 			r.push(oi);
 		}
 
-		Ok(SnapShot::new(r,o,u,self.hash))
+		after_callback(r,o,u)
+	}
+
+	pub fn promise_of_learn(&self,input:Vec<f64>) ->
+		Result<SnapShot,InvalidStateError> {
+
+		self.apply(input,|r,o,u| Ok(SnapShot::new(r,o,u,self.hash)))
 	}
 }
 pub struct SnapShot {
