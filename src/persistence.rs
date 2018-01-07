@@ -1,6 +1,7 @@
 use std::io::BufReader;
 use std::io::BufRead;
 use std::io::BufWriter;
+use std::io::Write;
 use std::path::Path;
 use std::fs::File;
 use std::fs::OpenOptions;
@@ -8,6 +9,8 @@ use InputReader;
 
 use std::io;
 use error::*;
+
+use Persistence;
 
 pub struct TextFileInputReader {
 	reader:Option<BufReader<File>>,
@@ -118,5 +121,21 @@ impl PersistenceWithTextFile {
 		Ok(PersistenceWithTextFile {
 			writer:BufWriter::new(OpenOptions::new().write(true).create(true).open(file)?),
 		})
+	}
+}
+impl Persistence<PersistenceWriteError> for PersistenceWithTextFile {
+	fn save(&mut self,layers:&Vec<Vec<Vec<f64>>>) -> Result<(),PersistenceWriteError> {
+		self.writer.write(b"#Rust simplenn config start.\n")?;
+
+		for units in layers {
+			for unit in units {
+				self.writer.write(format!("{}\n", unit.iter()
+													.map(|w| w.to_string())
+													.collect::<Vec<String>>()
+													.join(" ")).as_bytes())?;
+			}
+		}
+
+		Ok(())
 	}
 }

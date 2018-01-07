@@ -201,6 +201,13 @@ impl<'a> NNModel<'a> {
 			layers:layers,
 		})
 	}
+
+	pub fn save<P,E>(&mut self,mut persistence:P) -> Result<(),PersistenceError<E>>
+		where P: Persistence<E>, E: Error, PersistenceError<E>: From<E> {
+		persistence.save(&self.layers)?;
+
+		Ok(())
+	}
 }
 pub trait InputReader<E> {
 	fn read_vec(&mut self,usize,usize) -> Result<Vec<Vec<f64>>,E>;
@@ -210,5 +217,5 @@ pub trait ModelInputReader<E> {
 	fn read_model<'a>(&mut self) -> Result<NNModel<'a>, E>;
 }
 pub trait Persistence<E> {
-	fn save(&mut self) -> Result<(),E>;
+	fn save(&mut self,layers:&Vec<Vec<Vec<f64>>>) -> Result<(),E>;
 }

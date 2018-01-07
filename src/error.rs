@@ -131,7 +131,7 @@ impl<E> error::Error for PersistenceError<E> where E: Error + fmt::Debug {
 	 	}
 	 }
 }
-impl<E> From<E> for PersistenceError<E> {
+impl<E> From<E> for PersistenceError<E> where E: Error + fmt::Debug {
 	fn from(err: E) -> PersistenceError<E> {
 		PersistenceError::Fail(err)
 	}
