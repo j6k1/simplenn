@@ -330,8 +330,11 @@ impl<'a> NNModel<'a> {
 		after_callback(r,o,u)
 	}
 
-	pub fn promise_of_learn(&self,input:Vec<f64>) ->
+	pub fn promise_of_learn(&mut self,input:Vec<f64>) ->
 		Result<SnapShot,InvalidStateError> {
+
+		let mut rnd = rand::XorShiftRng::new_unseeded();
+		self.hash = rnd.next_u64();
 
 		self.apply(input,|r,o,u| Ok(SnapShot::new(r,o,u,self.hash)))
 	}
