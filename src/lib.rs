@@ -8,17 +8,17 @@ use function::optimizer::Optimizer;
 use error::*;
 use std::error::Error;
 
-pub struct NN<'a,O,E> where O: Optimizer, E: LossFunction {
+pub struct NN<'a,O,E,C> where O: Optimizer, E: LossFunction, C: Fn() -> O {
 	model:&'a NNModel<'a>,
-	optimizer:O,
+	optimizer_creator:C,
 	lossf:E,
 }
 
-impl<'a,O,E> NN<'a,O,E> where O: Optimizer, E: LossFunction {
-	pub fn new<F>(model:&'a NNModel<'a>,f:F,lossf:E) -> NN<'a,O,E> where F: Fn() -> O {
+impl<'a,O,E,C> NN<'a,O,E,C> where O: Optimizer, E: LossFunction, C: Fn() -> O {
+	pub fn new(model:&'a NNModel<'a>,optimizer_creator:C,lossf:E) -> NN<'a,O,E,C> {
 		NN {
 			model:model,
-			optimizer:f(),
+			optimizer_creator:optimizer_creator,
 			lossf:lossf,
 		}
 	}
