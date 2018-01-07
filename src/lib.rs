@@ -1,3 +1,5 @@
+extern crate rand;
+
 pub mod function;
 pub mod error;
 pub mod persistence;
@@ -7,6 +9,7 @@ use function::loss::*;
 use function::optimizer::*;
 use error::*;
 use std::error::Error;
+use rand::Rng;
 
 pub struct NN<'a,O,E,F> where O: Optimizer, E: LossFunction, F: Fn() -> O {
 	model:&'a NNModel<'a>,
@@ -33,6 +36,7 @@ impl<'a,O,E,F> NN<'a,O,E,F> where O: Optimizer, E: LossFunction, F: Fn() -> O {
 pub struct NNModel<'a> {
 	units:Vec<(usize,Option<&'a ActivateF>)>,
 	layers:Vec<Vec<Vec<f64>>>,
+	hash:u64,
 }
 impl<'a> NNModel<'a> {
 	pub fn load<I,E>(mut reader:I) -> Result<NNModel<'a>, E>
@@ -41,9 +45,11 @@ impl<'a> NNModel<'a> {
 	}
 
 	fn new(units:Vec<(usize,Option<&'a ActivateF>)>,layers:Vec<Vec<Vec<f64>>>) -> NNModel<'a> {
+		let mut rnd = rand::XorShiftRng::new_unseeded();
 		NNModel {
 			units:units,
 			layers:layers,
+			hash:rnd.next_u64(),
 		}
 	}
 
@@ -210,10 +216,10 @@ impl<'a> NNModel<'a> {
 			}
 		}
 
-		Ok(NNModel {
-			units:units,
-			layers:layers,
-		})
+		Ok(NNModel::new(
+			units,
+			layers,
+		))
 	}
 
 	pub fn promise_of_learn<O,E,F>(&self,input:Vec<f64>) ->
@@ -321,20 +327,22 @@ impl<'a> NNModel<'a> {
 			r.push(oi);
 		}
 
-		Ok(SnapShot::new(r,o,u))
+		Ok(SnapShot::new(r,o,u,self.hash))
 	}
 }
 pub struct SnapShot {
 	r:Vec<f64>,
 	o:Vec<Vec<f64>>,
 	u:Vec<Vec<f64>>,
+	hash:u64,
 }
 impl SnapShot {
-	pub fn new(r:Vec<f64>,o:Vec<Vec<f64>>,u:Vec<Vec<f64>>) -> SnapShot {
+	pub fn new(r:Vec<f64>,o:Vec<Vec<f64>>,u:Vec<Vec<f64>>,hash:u64) -> SnapShot {
 		SnapShot {
 			r:r,
 			o:o,
 			u:u,
+			hash:hash,
 		}
 	}
 }
