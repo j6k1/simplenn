@@ -1,5 +1,5 @@
 pub trait Optimizer {
-	fn update(&mut self,e:&Vec<f64>, w:&mut Vec<f64>);
+	fn update(&mut self,e:&[f64], win:&Vec<f64>,wout:&mut Vec<f64>);
 }
 pub struct SGD {
 	a:f64,
@@ -20,11 +20,11 @@ impl SGD {
 	}
 }
 impl Optimizer for SGD {
-	fn update(&mut self,e:&Vec<f64>, w:&mut Vec<f64>) {
+	fn update(&mut self,e:&[f64], win:&Vec<f64>,wout:&mut Vec<f64>) {
 		let a = self.a;
 		let lambda = self.lambda;
-		for (wi,&ei) in w.iter_mut().zip(e) {
-			*wi = *wi - a * ei + lambda * *wi;
+		for (w,(wi,ei)) in wout.iter_mut().zip((e.iter().zip(win))) {
+			*w = wi - a * ei + lambda * wi;
 		}
 	}
 }
@@ -41,19 +41,19 @@ impl Adagrad {
 	}
 }
 impl Optimizer for Adagrad {
-	fn update(&mut self,e:&Vec<f64>, w:&mut Vec<f64>) {
+	fn update(&mut self,e:&[f64], win:&Vec<f64>,wout:&mut Vec<f64>) {
 		const EPS:f64 = 1e-8f64;
 
 		match self.gt.len() {
-			0 => self.gt.resize(w.len(), 0f64),
+			0 => self.gt.resize(win.len(), 0f64),
 			_ => (),
 		};
 
 		let a = self.a;
 
-		for (wi,(gi,&ei)) in w.iter_mut().zip(self.gt.iter_mut().zip(e)) {
+		for ((w,wi),(gi,&ei)) in (wout.iter_mut().zip(win)).zip(self.gt.iter_mut().zip(e)) {
 			*gi = ei * ei;
-			*wi = *wi - a * ei / (gi.sqrt() + EPS);
+			*w = wi - a * ei / (gi.sqrt() + EPS);
 		}
 	}
 }
@@ -72,20 +72,20 @@ impl RMSprop {
 	}
 }
 impl Optimizer for RMSprop {
-	fn update(&mut self,e:&Vec<f64>, w:&mut Vec<f64>) {
+	fn update(&mut self,e:&[f64], win:&Vec<f64>,wout:&mut Vec<f64>) {
 		const EPS:f64 = 1e-8f64;
 
 		match self.gt.len() {
-			0 => self.gt.resize(w.len(), 0f64),
+			0 => self.gt.resize(win.len(), 0f64),
 			_ => (),
 		};
 
 		let a = self.a;
 		let mu = self.mu;
 
-		for (wi,(gi,&ei)) in w.iter_mut().zip(self.gt.iter_mut().zip(e)) {
+		for ((w,wi),(gi,&ei)) in (wout.iter_mut().zip(win)).zip(self.gt.iter_mut().zip(e)) {
 			*gi = mu * *gi + (1f64 - mu) * ei * ei;
-			*wi = *wi - a * ei / (gi.sqrt() + EPS);
+			*w = wi - a * ei / (gi.sqrt() + EPS);
 		}
 	}
 }
@@ -112,16 +112,16 @@ impl Adam {
 	}
 }
 impl Optimizer for Adam {
-	fn update(&mut self,e:&Vec<f64>, w:&mut Vec<f64>) {
+	fn update(&mut self,e:&[f64], win:&Vec<f64>,wout:&mut Vec<f64>) {
 		const EPS:f64 = 1e-8f64;
 
 		match self.mt.len() {
-			0 => self.mt.resize(w.len(), 0f64),
+			0 => self.mt.resize(win.len(), 0f64),
 			_ => (),
 		};
 
 		match self.vt.len() {
-			0 => self.vt.resize(w.len(), 0f64),
+			0 => self.vt.resize(win.len(), 0f64),
 			_ => (),
 		};
 
@@ -131,14 +131,14 @@ impl Optimizer for Adam {
 		let b1t = self.b1t;
 		let b2t = self.b2t;
 
-		for (wi,(&ei, (mi,vi))) in w.iter_mut()
+		for ((w,wi),(&ei, (mi,vi))) in (wout.iter_mut().zip(win))
 									.zip(e.iter().zip(
 											self.mt.iter_mut().zip(self.vt.iter_mut()))) {
 			*mi = b1 * *mi + (1f64 - self.b1) * ei;
 			*vi = b2 * *vi + (1f64 - self.b2) * ei * ei;
-			*wi = *wi - a * ei / (vi.sqrt() + EPS);
+			*w = wi - a * ei / (vi.sqrt() + EPS);
 
-			*wi = *wi - a * (*mi / (1f64 - b1t)) / ((*vi / (1f64 - b2t)) + EPS).sqrt();
+			*w = wi - a * (*mi / (1f64 - b1t)) / ((*vi / (1f64 - b2t)) + EPS).sqrt();
 		}
 
 		self.b1t = b1t * b1;
