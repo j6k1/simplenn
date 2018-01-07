@@ -330,6 +330,12 @@ impl<'a> NNModel<'a> {
 		after_callback(r,o,u)
 	}
 
+	pub fn solve(&mut self,input:Vec<f64>) ->
+		Result<Vec<f64>,InvalidStateError> {
+
+		self.apply(input,|r,_,_| Ok(r))
+	}
+
 	pub fn promise_of_learn(&mut self,input:Vec<f64>) ->
 		Result<SnapShot,InvalidStateError> {
 
