@@ -15,7 +15,7 @@ pub struct TextFileInputReader {
 	index:usize,
 }
 impl TextFileInputReader {
-	pub fn new (file:String) -> Result<TextFileInputReader, StartupError> {
+	pub fn new (file:String) -> Result<TextFileInputReader, ConfigReadError> {
 		Ok(match Path::new(&*file).exists() {
 			true => {
 				TextFileInputReader {
@@ -32,19 +32,19 @@ impl TextFileInputReader {
 		})
 	}
 
-	fn read_line(&mut self) -> Result<String, StartupError> {
+	fn read_line(&mut self) -> Result<String, ConfigReadError> {
 		match self.reader {
 			Some(ref mut reader) => {
 				let mut buf = String::new();
 				reader.read_line(&mut buf)?;
 				Ok(buf)
 			},
-			None => Err(StartupError::InavalidState(String::from(
+			None => Err(ConfigReadError::InavalidState(String::from(
 													"The file does not exist yet."))),
 		}
 	}
 
-	fn next_token(&mut self) -> Result<String, StartupError> {
+	fn next_token(&mut self) -> Result<String, ConfigReadError> {
 		let t = match self.line {
 			None => {
 				let mut buf = self.read_line()?;
@@ -85,12 +85,12 @@ impl TextFileInputReader {
 		Ok(t)
 	}
 
-	fn next_double(&mut self) -> Result<f64, StartupError> {
+	fn next_double(&mut self) -> Result<f64, ConfigReadError> {
 		Ok(self.next_token()?.parse::<f64>()?)
 	}
 }
-impl InputReader<StartupError> for TextFileInputReader {
-	fn read_vec(&mut self, units:usize, w:usize) -> Result<Vec<Vec<f64>>, StartupError> {
+impl InputReader<ConfigReadError> for TextFileInputReader {
+	fn read_vec(&mut self, units:usize, w:usize) -> Result<Vec<Vec<f64>>, ConfigReadError> {
 		let mut v:Vec<Vec<f64>> = Vec::with_capacity(units);
 
 		for _ in 0..units {

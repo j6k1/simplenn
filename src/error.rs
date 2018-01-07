@@ -1,56 +1,82 @@
 use std::io;
 use std::fmt;
 use std::error;
+use std::error::Error;
 use std::num::ParseFloatError;
 
 #[derive(Debug)]
-pub enum StartupError {
+pub enum StartupError<E> {
 	InvalidConfiguration(String),
-	InavalidState(String),
-	ParseFloatError(ParseFloatError),
-	IOError(io::Error),
-	Fail(String),
+	Fail(E),
 }
-impl fmt::Display for StartupError {
-	 fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-	 	match *self {
-	 		StartupError::InvalidConfiguration(ref s) => write!(f, "{}",s),
-	 		StartupError::InavalidState(ref s) => write!(f, "{}",s),
-	 		StartupError::ParseFloatError(_) => write!(f, "An error occurred when converting a string to a double value."),
-	 		StartupError::IOError(_) => write!(f,"Error occurred in file I/O."),
-	 		StartupError::Fail(_) => write!(f, "User error."),
-	 	}
-	 }
-}
-impl error::Error for StartupError {
-	 fn description(&self) -> &str {
-	 	match *self {
-	 		StartupError::InvalidConfiguration(_) => "Configuration is invalid.",
-	 		StartupError::InavalidState(_) => "This operation is not allowed in the current state.",
-	 		StartupError::ParseFloatError(_) => "An error occurred when converting a string to a double value.",
-	 		StartupError::IOError(_) => "Error occurred in file I/O.",
-	 		StartupError::Fail(_) => "User error.",
-	 	}
-	 }
-
-	fn cause(&self) -> Option<&error::Error> {
-	 	match *self {
-	 		StartupError::InvalidConfiguration(_) => None,
-	 		StartupError::InavalidState(_) => None,
-	 		StartupError::ParseFloatError(ref e) => Some(e),
-	 		StartupError::IOError(ref e) => Some(e),
-	 		StartupError::Fail(_) => None,
-	 	}
-	 }
-}
-impl<'a> From<io::Error> for StartupError {
-	fn from(err: io::Error) -> StartupError {
-		StartupError::IOError(err)
+impl<E> fmt::Display for StartupError<E> {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match *self {
+			StartupError::InvalidConfiguration(ref s) => write!(f, "{}",s),
+			StartupError::Fail(_) => write!(f, "Startup Failed."),
+		}
 	}
 }
-impl<'a> From<ParseFloatError> for StartupError {
-	fn from(err: ParseFloatError) -> StartupError {
-		StartupError::ParseFloatError(err)
+impl<E> error::Error for StartupError<E> where E: Error + fmt::Debug {
+	fn description(&self) -> &str {
+		match *self {
+			StartupError::InvalidConfiguration(_) => "Configuration is invalid.",
+			StartupError::Fail(_) => "Startup Failed.",
+		}
+	}
+
+	fn cause(&self) -> Option<&error::Error> {
+		match *self {
+			StartupError::InvalidConfiguration(_) => None,
+			StartupError::Fail(ref e) => Some(e),
+		}
+	}
+}
+impl<E> From<E> for StartupError<E> where E: Error + fmt::Debug {
+	fn from(err: E) -> StartupError<E> {
+		StartupError::Fail(err)
+	}
+}
+#[derive(Debug)]
+pub enum ConfigReadError {
+	IOError(io::Error),
+	InavalidState(String),
+	ParseFloatError(ParseFloatError)
+}
+impl fmt::Display for ConfigReadError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match *self {
+			ConfigReadError::IOError(_) => write!(f, "Error occurred in file I/O."),
+			ConfigReadError::InavalidState(ref s) => write!(f, "{}",s),
+			ConfigReadError::ParseFloatError(_) => write!(f, "An error occurred when converting a string to a double value."),
+		}
+	}
+}
+impl error::Error for ConfigReadError {
+	fn description(&self) -> &str {
+		match *self {
+			ConfigReadError::IOError(_) => "Error occurred in file I/O.",
+			ConfigReadError::InavalidState(_) => "Configuration is invalid.",
+			ConfigReadError::ParseFloatError(_) => "An error occurred when converting a string to a double value."
+		}
+	}
+
+	fn cause(&self) -> Option<&error::Error> {
+		match *self {
+			ConfigReadError::IOError(ref e) => Some(e),
+			ConfigReadError::InavalidState(_) => None,
+			ConfigReadError::ParseFloatError(ref e) => Some(e),
+		}
+	}
+}
+impl From<io::Error> for ConfigReadError {
+	fn from(err: io::Error) -> ConfigReadError {
+		ConfigReadError::IOError(err)
+	}
+}
+impl From<ParseFloatError> for ConfigReadError {
+	fn from(err: ParseFloatError) -> ConfigReadError {
+		ConfigReadError::ParseFloatError(err)
 	}
 }
 #[derive(Debug)]

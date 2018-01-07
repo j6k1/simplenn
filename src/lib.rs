@@ -29,7 +29,7 @@ pub struct NNModel<'a> {
 }
 impl<'a> NNModel<'a> {
 	pub fn load<I,E>(mut reader:I) -> Result<NNModel<'a>, E>
-		where I: ModelInputReader<E>, E: Error, StartupError: From<E> {
+		where I: ModelInputReader<E>, E: Error, StartupError<E>: From<E> {
 		reader.read_model()
 	}
 
@@ -38,8 +38,8 @@ impl<'a> NNModel<'a> {
 												units:Vec<(usize,&'a ActivateF)>,
 												reader:I,bias:f64,
 												initializer:F) ->
-		Result<NNModel<'a>,StartupError>
-		where I: InputReader<E>, F: Fn() -> f64, E: Error, StartupError: From<E> {
+		Result<NNModel<'a>,StartupError<E>>
+		where I: InputReader<E>, F: Fn() -> f64, E: Error, StartupError<E>: From<E> {
 
 		match units.len() {
 			l if l < 2 => {
@@ -85,8 +85,8 @@ impl<'a> NNModel<'a> {
 												units:Vec<(usize,&'a ActivateF)>,
 												reader:I,
 												init_list:Vec<(f64,F)>) ->
-		Result<NNModel<'a>,StartupError>
-		where I: InputReader<E>, F: Fn() -> f64, E: Error, StartupError: From<E> {
+		Result<NNModel<'a>,StartupError<E>>
+		where I: InputReader<E>, F: Fn() -> f64, E: Error, StartupError<E>: From<E> {
 
 		match units.len() {
 			l if l < 2 => {
@@ -132,8 +132,8 @@ impl<'a> NNModel<'a> {
 	}
 
 	pub fn with_schema<I,F,E>(iunits:usize,units:Vec<(usize,&'a ActivateF)>,mut reader:I,initializer:F) ->
-		Result<NNModel<'a>,StartupError>
-		where I: InputReader<E>, F: Fn() -> Vec<Vec<Vec<f64>>>, E: Error, StartupError: From<E> {
+		Result<NNModel<'a>,StartupError<E>>
+		where I: InputReader<E>, F: Fn() -> Vec<Vec<Vec<f64>>>, E: Error, StartupError<E>: From<E> {
 
 		match units.len() {
 			l if l < 2 => {
