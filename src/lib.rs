@@ -12,18 +12,42 @@ use std::error::Error;
 use rand::Rng;
 
 pub struct NN<'a,O,E,F> where O: Optimizer, E: LossFunction, F: Fn() -> O {
-	model:&'a NNModel<'a>,
+	model:&'a mut NNModel<'a>,
 	optimizer_creator:F,
 	lossf:E,
 }
 
 impl<'a,O,E,F> NN<'a,O,E,F> where O: Optimizer, E: LossFunction, F: Fn() -> O {
-	pub fn new(model:&'a NNModel<'a>,optimizer_creator:F,lossf:E) -> NN<'a,O,E,F> {
+	pub fn new(model:&'a mut NNModel<'a>,optimizer_creator:F,lossf:E) -> NN<'a,O,E,F> {
 		NN {
 			model:model,
 			optimizer_creator:optimizer_creator,
 			lossf:lossf,
 		}
+	}
+
+	pub fn solve(&mut self,input:Vec<f64>) ->
+		Result<Vec<f64>,InvalidStateError> {
+
+		self.model.apply(input,|r,_,_| Ok(r))
+	}
+
+	pub fn promise_of_learn(&mut self,input:Vec<f64>) ->
+		Result<SnapShot,InvalidStateError> {
+
+		self.model.apply(input,|r,o,u| Ok(SnapShot::new(r,o,u,self.model.hash)))
+	}
+
+	pub fn learn(&mut self,input:Vec<f64>,t:Vec<f64>) -> Result<(),InvalidStateError>
+		where O: Optimizer, E: LossFunction {
+
+		Ok(self.model.learn(input,&t,&(self.optimizer_creator)(),&self.lossf)?)
+	}
+
+	pub fn latter_part_of_learning(&mut self, t:&Vec<f64>,s:SnapShot) ->
+		Result<(),InvalidStateError> {
+
+		Ok(self.model.latter_part_of_learning(t,s,&(self.optimizer_creator)(),&self.lossf)?)
 	}
 
 	pub fn save<P,ERR>(&mut self,mut persistence:P) -> Result<(),PersistenceError<ERR>>
@@ -309,8 +333,8 @@ impl<'a> NNModel<'a> {
 		after_callback(r,o,u)
 	}
 
-	pub fn latter_part_of_learning(mut self, t:&Vec<f64>,s:SnapShot) ->
-		Result<(),InvalidStateError> {
+	fn latter_part_of_learning<O,E>(&mut self, t:&Vec<f64>,s:SnapShot,optimizer:&O,lossf:&E) ->
+		Result<(),InvalidStateError> where O: Optimizer, E: LossFunction {
 
 		if s.hash != self.hash {
 			return Err(InvalidStateError::GenerationError(String::from(
@@ -388,13 +412,21 @@ impl<'a> NNModel<'a> {
 		Ok(())
 	}
 
-	pub fn solve(&mut self,input:Vec<f64>) ->
+	fn solve(&mut self,input:Vec<f64>) ->
 		Result<Vec<f64>,InvalidStateError> {
 
 		self.apply(input,|r,_,_| Ok(r))
 	}
 
-	pub fn promise_of_learn(&mut self,input:Vec<f64>) ->
+	fn learn<O,E>(&mut self,input:Vec<f64>,t:&Vec<f64>,optimizer:&O,lossf:&E) -> Result<(),InvalidStateError>
+		where O: Optimizer, E: LossFunction {
+
+		let s = self.promise_of_learn(input)?;
+
+		self.latter_part_of_learning(t,s,optimizer,lossf)
+	}
+
+	fn promise_of_learn(&mut self,input:Vec<f64>) ->
 		Result<SnapShot,InvalidStateError> {
 
 		let mut rnd = rand::XorShiftRng::new_unseeded();
