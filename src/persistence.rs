@@ -126,14 +126,17 @@ impl PersistenceWithTextFile {
 impl Persistence<PersistenceWriteError> for PersistenceWithTextFile {
 	fn save(&mut self,layers:&Vec<Vec<Vec<f64>>>) -> Result<(),PersistenceWriteError> {
 		self.writer.write(b"#Rust simplenn config start.\n")?;
-
+		let mut i = 0;
 		for units in layers {
+			self.writer.write(format!("#layer: {}\n", i).as_bytes())?;
+
 			for unit in units {
 				self.writer.write(format!("{}\n", unit.iter()
 													.map(|w| w.to_string())
 													.collect::<Vec<String>>()
 													.join(" ")).as_bytes())?;
 			}
+			i = i + 1;
 		}
 
 		Ok(())
