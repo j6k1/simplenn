@@ -369,8 +369,17 @@ impl<'a> NNModel<'a> {
 
 		let hl = self.units.len()-2;
 		let l = self.units.len()-1;
-		for k in 1..self.units[l].0 + 1 {
-			d[k] = (lossf.derive(s.r[k-1], t[k-1])) * f.derive(s.u[l][k]);
+		match lossf.is_canonical_link(f) {
+			true => {
+				for k in 1..self.units[l].0 + 1 {
+					d[k] = s.r[k-1] - t[k-1];
+				}
+			},
+			false => {
+				for k in 1..self.units[l].0 + 1 {
+					d[k] = (lossf.derive(s.r[k-1], t[k-1])) * f.derive(s.u[l][k]);
+				}
+			}
 		}
 
 		for j in 0..self.units[hl].0 + 1 {

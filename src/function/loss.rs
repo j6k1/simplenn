@@ -1,6 +1,11 @@
+use function::activation::ActivateF;
+
 pub trait LossFunction {
 	fn apply(&self,r:f64,t:f64) -> f64;
 	fn derive(&self,r:f64,t:f64) -> f64;
+	fn is_canonical_link(&self,_:&ActivateF) -> bool {
+		false
+	}
 }
 pub struct Mse {
 
@@ -17,6 +22,13 @@ impl LossFunction for Mse {
 
 	fn derive(&self,r:f64,t:f64) -> f64 {
 		r- t
+	}
+
+	fn is_canonical_link(&self,f:&ActivateF) -> bool {
+		match f.kind() {
+			"identity" => true,
+			_ => false,
+		}
 	}
 }
 pub struct CrossEntropy {
@@ -35,6 +47,13 @@ impl LossFunction for CrossEntropy {
 	fn derive(&self,r:f64,t:f64) -> f64 {
 		(r - t) / (r * (1.0f64 - r))
 	}
+
+	fn is_canonical_link(&self,f:&ActivateF) -> bool {
+		match f.kind() {
+			"sigmoid" => true,
+			_ => false,
+		}
+	}
 }
 pub struct CrossEntropyMulticlass {
 
@@ -52,5 +71,12 @@ impl LossFunction for CrossEntropyMulticlass {
 
 	fn derive(&self,r:f64,t:f64) -> f64 {
 		-t / r
+	}
+
+	fn is_canonical_link(&self,f:&ActivateF) -> bool {
+		match f.kind() {
+			"softmax" => true,
+			_ => false,
+		}
 	}
 }
