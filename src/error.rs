@@ -82,11 +82,13 @@ impl From<ParseFloatError> for ConfigReadError {
 #[derive(Debug)]
 pub enum InvalidStateError {
 	InvalidInput(String),
+	GenerationError(String),
 }
 impl fmt::Display for InvalidStateError {
 	 fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 	 	match *self {
 	 		InvalidStateError::InvalidInput(ref s) => write!(f, "{}",s),
+	 		InvalidStateError::GenerationError(ref s) => write!(f, "{}",s),
 	 	}
 	 }
 }
@@ -94,12 +96,14 @@ impl error::Error for InvalidStateError {
 	 fn description(&self) -> &str {
 	 	match *self {
 	 		InvalidStateError::InvalidInput(_) => "The input value is invalid.",
+	 		InvalidStateError::GenerationError(_) => "The snapshot is invalid."
 	 	}
 	 }
 
 	fn cause(&self) -> Option<&error::Error> {
 	 	match *self {
 	 		InvalidStateError::InvalidInput(_) => None,
+	 		InvalidStateError::GenerationError(_) => None,
 	 	}
 	 }
 }

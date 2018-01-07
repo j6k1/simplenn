@@ -225,7 +225,7 @@ impl<'a> NNModel<'a> {
 	pub fn apply<F,R>(&self,input:Vec<f64>,after_callback:F) -> Result<R,InvalidStateError>
 		where F: Fn(Vec<f64>,Vec<Vec<f64>>,Vec<Vec<f64>>) -> Result<R,InvalidStateError> {
 
-		if input.len() != self.units.len() {
+		if input.len() != self.units[0].0 {
 			return Err(InvalidStateError::InvalidInput(String::from(
 				"The inputs to the input layer is invalid (the count of inputs must be the count of units)")));
 		}
@@ -250,11 +250,11 @@ impl<'a> NNModel<'a> {
 		u[1].resize(self.units[1].0 + 1, 0f64);
 
 		//for(int k=1, K=units[1].size+1; k < K; k++)
-		for (u,(&oi,li)) in u[1].iter_mut().zip(o[0].iter().zip(&self.layers[0])) {
+		for k in 1..self.units[1].0 + 1 {
 			//for(int j=0, J=units[0].size+1; j < J; j++)
-			for ui in li {
-				*u = *u + oi * ui;
+			for j in 0..self.units[0].0 + 1 {
 				//u[1][k] += (o[0][j] * layers[0][j][k-1]);
+				u[1][k] += o[0][j] * self.layers[0][j][k-1];
 			}
 		}
 
@@ -299,22 +299,18 @@ impl<'a> NNModel<'a> {
 			let ol:Vec<f64> = Vec::with_capacity(self.units[ll].0 + 1);
 			o.push(ol);
 
-			let layer = &self.layers[l];
+			o[ll][0] = 1f64;
 
 			//for(int k=1, K = units[ll].size+1; k < K; k++)
-			for (ui,k) in u[ll].iter_mut().zip(0..self.units[ll].0) {
+			for k in 1..self.units[ll].0 + 1 {
 				//for(int j=0, J=units[l].size+1; j < J; j++)
-				for (&oi,j) in o[l].iter().zip(0..self.units[l].0 + 1) {
-					//u[ll][k] += o[l][j] * layers[l][j][k-1];
-					*ui = *ui + oi * layer[j][k];
+				for j in 0..self.units[l].0 + 1 {
+					u[ll][k] = u[ll][k] + o[l][j] * self.layers[l][j][k-1];
 				}
 
-				//o[ll][k] = f.apply(*u[ll][k]);
+				//o[ll][k] = f.apply(u[ll][k]);
 				//o[ll][0] = 1.0;
-			}
-
-			for (oi,&ui) in o[ll].iter_mut().zip(u[ll].iter()) {
-				*oi = f.apply(ui, &u[ll]);
+				o[ll][k] = f.apply(u[ll][k],&u[ll]);
 			}
 		}
 
@@ -328,6 +324,110 @@ impl<'a> NNModel<'a> {
 		}
 
 		after_callback(r,o,u)
+	}
+
+	pub fn latter_part_of_learning(mut self, t:&Vec<f64>,s:SnapShot) ->
+		Result<(),InvalidStateError> {
+
+		if s.hash != self.hash {
+			return Err(InvalidStateError::GenerationError(String::from(
+				"Snapshot and model generation do not match. The snapshot used for learning needs to be the latest one."
+			)));
+		}
+
+		//double[][][] layers = new double[units.length-1][][];
+		//double[] d = new double[units[units.length-1].size+1];
+		let mut layers:Vec<Vec<Vec<f64>>> = Vec::with_capacity(self.units.len()-1);
+		let mut d:Vec<f64> = Vec::with_capacity(self.units[self.units.len()-1].0 + 1);
+		d.resize(self.units.len()-1, 0f64);
+
+		//for(int l=0, L = units.length-1; l < L; l++)
+		for l in 0..self.units.len() - 1 {
+			//layers[l] = new double[units[l].size+1][];
+			let layer:Vec<Vec<f64>> = Vec::with_capacity(self.units[l].0 + 1);
+
+			layers.push(layer);
+		}
+
+		//IActivateFunction f = units[units.length-1].f;
+		let f:&ActivateF = match self.units[1].1 {
+			Some(f) => f,
+			None => {
+				return Err(InvalidStateError::InvalidInput(String::from(
+							"Reference to the activation function object is not set."
+						)));
+			}
+		};
+
+		let size = self.units[self.units.len()-1].0;
+
+		//for(int j=0, l=units.length-2, ll=l+1, J=units[l].size+1; j < J; j++)
+		for l in self.layers[self.units.len()-2].iter_mut() {
+			//layers[l][j] = new double[units[ll].size];
+			l.resize(size,0f64);
+		}
+
+		//for(int k=1,
+		//		hl=units.length-2,
+		//		l=units.length-1,
+		//		K=units[l].size+1; k < K; k++)
+		let hl = self.units.len()-2;
+		let l = self.units.len()-1;
+		for k in 1..self.units[l].0 + 1 {
+			d[k] = (s.r[k-1] - t[k-1]) * f.derive(s.u[l][k]);
+			//for(int j=0, J=units[hl].size+1; j < J; j++)
+			for j in 0..self.units[hl].0 + 1 {
+				layers[hl][j][k-1] = self.layers[hl][j][k-1] - d[k] * s.o[hl][j];
+			}
+		}
+		//for(int l=units.length - 2; l >= 1; l--)
+		for l in (0..self.units.len()-2).rev() {
+			//final int hl = l - 1;
+			//final int ll = l + 1;
+			let hl = l - 1;
+			let ll = l + 1;
+			//f = units[l].f;
+			let f:&ActivateF = match self.units[1].1 {
+				Some(f) => f,
+				None => {
+					return Err(InvalidStateError::InvalidInput(String::from(
+								"Reference to the activation function object is not set."
+							)));
+				}
+			};
+
+			//double[] nd = new double[units[l].size+1];
+			let mut nd:Vec<f64> = Vec::with_capacity(self.units[l].0 + 1);
+
+			//for(int i=0, I=units[hl].size+1; i < I; i++)
+			for li in layers[hl].iter_mut() {
+				//layers[hl][i] = new double[units[l].size+1];
+				li.resize(self.units[l].0 + 1,0f64);
+			}
+
+			//for(int j=1, J=units[l].size+1; j < J; j++)
+			for j in 1..self.units[l].0 + 1{
+				//for(int k=1, K=units[ll].size+1; k < K; k++)
+				for k in 1..self.units[ll].0 + 1 {
+					//nd[j] += (this.layers[l][j][k-1] * d[k]);
+					nd[j] += self.layers[l][j][k-1] * d[k];
+				}
+				nd[j] = nd[j] * f.derive(s.u[l][j]);
+
+				//for(int i=0, I=units[hl].size+1; i < I; i++) {
+					//layers[hl][i][j-1] = this.layers[hl][i][j-1] - a * nd[j]* o[hl][i];
+				//}
+				for i in 0..self.units[hl].0 + 1 {
+					layers[hl][i][j-1] = self.layers[hl][i][j-1] - nd[j] * s.o[hl][i];
+				}
+			}
+
+			d = nd;
+		}
+
+		self.layers = layers;
+
+		Ok(())
 	}
 
 	pub fn solve(&mut self,input:Vec<f64>) ->
