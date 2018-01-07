@@ -105,28 +105,24 @@ impl error::Error for InvalidStateError {
 }
 #[derive(Debug)]
 pub enum PersistenceError<E> {
-	IOError(io::Error),
 	Fail(E),
 }
 impl<E> fmt::Display for PersistenceError<E> where E: Error + fmt::Debug {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match *self {
-			PersistenceError::IOError(_) => write!(f,"Error occurred in file I/O."),
-			PersistenceError::Fail(_) => write!(f, "User error."),
+			PersistenceError::Fail(_) => write!(f, "Persistence failed."),
 		}
 	}
 }
 impl<E> error::Error for PersistenceError<E> where E: Error + fmt::Debug {
 	fn description(&self) -> &str {
 		match *self {
-			PersistenceError::IOError(_) => "Error occurred in file I/O.",
-			PersistenceError::Fail(_) => "User error.",
+			PersistenceError::Fail(_) => "Persistence failed.",
 		}
 	}
 
 	fn cause(&self) -> Option<&error::Error> {
 	 	match *self {
-	 		PersistenceError::IOError(ref e) => Some(e),
 	 		PersistenceError::Fail(_) => None,
 	 	}
 	 }
