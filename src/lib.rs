@@ -370,7 +370,7 @@ impl<'a> NNModel<'a> {
 		let hl = self.units.len()-2;
 		let l = self.units.len()-1;
 		for k in 1..self.units[l].0 + 1 {
-			d[k] = (s.r[k-1] - t[k-1]) * f.derive(s.u[l][k]);
+			d[k] = (lossf.derive(s.r[k-1], t[k-1])) * f.derive(s.u[l][k]);
 			for j in 0..self.units[hl].0 + 1 {
 				layers[hl][j][k-1] = self.layers[hl][j][k-1] - d[k] * s.o[hl][j];
 			}

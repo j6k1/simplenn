@@ -1,6 +1,6 @@
 pub trait LossFunction {
-	fn apply(r:f64,t:f64) -> f64;
-	fn derive(r:f64,t:f64) -> f64;
+	fn apply(&self,r:f64,t:f64) -> f64;
+	fn derive(&self,r:f64,t:f64) -> f64;
 }
 pub struct Mse {
 
@@ -11,11 +11,11 @@ impl Mse {
 	}
 }
 impl LossFunction for Mse {
-	fn apply(r:f64,t:f64) -> f64 {
+	fn apply(&self,r:f64,t:f64) -> f64 {
 		(r - t) * (r - t) / 2f64
 	}
 
-	fn derive(r:f64,t:f64) -> f64 {
+	fn derive(&self,r:f64,t:f64) -> f64 {
 		r- t
 	}
 }
@@ -28,11 +28,11 @@ impl CrossEntropy {
 	}
 }
 impl LossFunction for CrossEntropy {
-	fn apply(r:f64,t:f64) -> f64 {
+	fn apply(&self,r:f64,t:f64) -> f64 {
 		-t * r.ln() - (1.0f64 - t) * (1.0f64 - r).ln()
 	}
 
-	fn derive(r:f64,t:f64) -> f64 {
+	fn derive(&self,r:f64,t:f64) -> f64 {
 		(r - t) / (r * (1.0f64 - r))
 	}
 }
@@ -46,11 +46,11 @@ impl CrossEntropyMulticlass {
 	}
 }
 impl LossFunction for CrossEntropyMulticlass {
-	fn apply(r:f64,t:f64) -> f64 {
+	fn apply(&self,r:f64,t:f64) -> f64 {
 		-t * r.ln()
 	}
 
-	fn derive(r:f64,t:f64) -> f64 {
+	fn derive(&self,r:f64,t:f64) -> f64 {
 		-t / r
 	}
 }
