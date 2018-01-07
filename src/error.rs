@@ -104,25 +104,25 @@ impl error::Error for InvalidStateError {
 	 }
 }
 #[derive(Debug)]
-pub enum PersistenceError {
+pub enum PersistenceError<E> {
 	IOError(io::Error),
-	Fail(String),
+	Fail(E),
 }
-impl fmt::Display for PersistenceError {
-	 fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-	 	match *self {
-	 		PersistenceError::IOError(_) => write!(f,"Error occurred in file I/O."),
-	 		PersistenceError::Fail(_) => write!(f, "User error."),
-	 	}
-	 }
+impl<E> fmt::Display for PersistenceError<E> where E: Error + fmt::Debug {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match *self {
+			PersistenceError::IOError(_) => write!(f,"Error occurred in file I/O."),
+			PersistenceError::Fail(_) => write!(f, "User error."),
+		}
+	}
 }
-impl error::Error for PersistenceError {
-	 fn description(&self) -> &str {
-	 	match *self {
-	 		PersistenceError::IOError(_) => "Error occurred in file I/O.",
-	 		PersistenceError::Fail(_) => "User error.",
-	 	}
-	 }
+impl<E> error::Error for PersistenceError<E> where E: Error + fmt::Debug {
+	fn description(&self) -> &str {
+		match *self {
+			PersistenceError::IOError(_) => "Error occurred in file I/O.",
+			PersistenceError::Fail(_) => "User error.",
+		}
+	}
 
 	fn cause(&self) -> Option<&error::Error> {
 	 	match *self {
@@ -131,8 +131,37 @@ impl error::Error for PersistenceError {
 	 	}
 	 }
 }
-impl From<io::Error> for PersistenceError {
-	fn from(err: io::Error) -> PersistenceError {
-		PersistenceError::IOError(err)
+impl<E> From<E> for PersistenceError<E> {
+	fn from(err: E) -> PersistenceError<E> {
+		PersistenceError::Fail(err)
+	}
+}
+#[derive(Debug)]
+pub enum PersistenceWriteError {
+	IOError(io::Error),
+}
+impl fmt::Display for PersistenceWriteError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match *self {
+			PersistenceWriteError::IOError(_) => write!(f,"Error occurred in file I/O."),
+		}
+	}
+}
+impl error::Error for PersistenceWriteError {
+	fn description(&self) -> &str {
+		match *self {
+			PersistenceWriteError::IOError(_) => "Error occurred in file I/O.",
+		}
+	}
+
+	fn cause(&self) -> Option<&error::Error> {
+	 	match *self {
+	 		PersistenceWriteError::IOError(ref e) => Some(e),
+	 	}
+	 }
+}
+impl From<io::Error> for PersistenceWriteError {
+	fn from(err: io::Error) -> PersistenceWriteError {
+		PersistenceWriteError::IOError(err)
 	}
 }
