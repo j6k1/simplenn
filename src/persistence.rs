@@ -20,7 +20,8 @@ pub struct TextFileInputReader {
 	index:usize,
 }
 impl TextFileInputReader {
-	pub fn new (file:&str) -> Result<TextFileInputReader, ConfigReadError> {
+	pub fn new (file:&str) -> Result<TextFileInputReader, ConfigReadError>
+		where ConfigReadError: Error + fmt::Debug, StartupError<ConfigReadError>: From<ConfigReadError> {
 		Ok(match Path::new(file).exists() {
 			true => {
 				TextFileInputReader {
@@ -118,7 +119,9 @@ impl InputReader<ConfigReadError> for TextFileInputReader where ConfigReadError:
 pub struct PersistenceWithTextFile {
 	writer:BufWriter<File>,
 }
-impl PersistenceWithTextFile {
+impl PersistenceWithTextFile
+	where PersistenceWriteError: Error + fmt::Debug,
+			PersistenceError<PersistenceWriteError>: From<PersistenceWriteError> {
 	pub fn new(file:&str) -> Result<PersistenceWithTextFile,io::Error> {
 		Ok(PersistenceWithTextFile {
 			writer:BufWriter::new(OpenOptions::new().write(true).create(true).open(file)?),
