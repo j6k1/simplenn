@@ -470,6 +470,10 @@ impl SnapShot {
 			hash:hash,
 		}
 	}
+
+	pub fn get_result(&self) -> Vec<f64> {
+		self.r.clone()
+	}
 }
 pub trait InputReader<E> {
 	fn read_vec(&mut self,usize,usize) -> Result<Vec<Vec<f64>>,E>;
