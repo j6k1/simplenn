@@ -334,7 +334,7 @@ impl<'a> NNModel<'a> {
 
 		let mut r:Vec<f64> = Vec::with_capacity(self.units[self.units.len()-1].0);
 
-		for &oi in o[self.units.len()-1].iter() {
+		for &oi in o[self.units.len()-1].iter().skip(1) {
 			r.push(oi);
 		}
 
