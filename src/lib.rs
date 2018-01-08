@@ -4,12 +4,14 @@ pub mod function;
 pub mod error;
 pub mod persistence;
 
-use function::activation::*;
-use function::loss::*;
-use function::optimizer::*;
+use std::fmt;
 use error::*;
 use std::error::Error;
 use rand::Rng;
+
+use function::activation::*;
+use function::loss::*;
+use function::optimizer::*;
 
 pub struct NN<'a,O,E,F> where O: Optimizer, E: LossFunction, F: Fn() -> O {
 	model:&'a mut NNModel<'a>,
@@ -475,13 +477,13 @@ impl SnapShot {
 		self.r.clone()
 	}
 }
-pub trait InputReader<E> {
+pub trait InputReader<E> where E: Error + fmt::Debug {
 	fn read_vec(&mut self,usize,usize) -> Result<Vec<Vec<f64>>,E>;
 	fn source_exists(&mut self) -> bool;
 }
-pub trait ModelInputReader<E> {
+pub trait ModelInputReader<E> where E: Error + fmt::Debug {
 	fn read_model<'a>(&mut self) -> Result<NNModel<'a>, E>;
 }
-pub trait Persistence<E> {
+pub trait Persistence<E> where E: Error + fmt::Debug {
 	fn save(&mut self,layers:&Vec<Vec<Vec<f64>>>) -> Result<(),E>;
 }
