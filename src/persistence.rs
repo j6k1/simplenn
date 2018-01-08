@@ -7,8 +7,10 @@ use std::fs::File;
 use std::fs::OpenOptions;
 use InputReader;
 
+use std::fmt;
 use std::io;
 use error::*;
+use std::error::Error;
 
 use Persistence;
 
@@ -92,7 +94,7 @@ impl TextFileInputReader {
 		Ok(self.next_token()?.parse::<f64>()?)
 	}
 }
-impl InputReader<ConfigReadError> for TextFileInputReader {
+impl InputReader<ConfigReadError> for TextFileInputReader where ConfigReadError: Error + fmt::Debug {
 	fn read_vec(&mut self, units:usize, w:usize) -> Result<Vec<Vec<f64>>, ConfigReadError> {
 		let mut v:Vec<Vec<f64>> = Vec::with_capacity(units);
 
@@ -123,7 +125,7 @@ impl PersistenceWithTextFile {
 		})
 	}
 }
-impl Persistence<PersistenceWriteError> for PersistenceWithTextFile {
+impl Persistence<PersistenceWriteError> for PersistenceWithTextFile where PersistenceWriteError: Error + fmt::Debug {
 	fn save(&mut self,layers:&Vec<Vec<Vec<f64>>>) -> Result<(),PersistenceWriteError> {
 		self.writer.write(b"#Rust simplenn config start.\n")?;
 		let mut i = 0;
