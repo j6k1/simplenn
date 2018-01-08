@@ -371,7 +371,7 @@ impl<'a> NNModel<'a> {
 
 		let size = self.units[self.units.len()-1].0;
 
-		for l in self.layers[self.units.len()-2].iter_mut() {
+		for l in layers[self.units.len()-2].iter_mut() {
 			l.resize(size,0f64);
 		}
 
