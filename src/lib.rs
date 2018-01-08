@@ -428,7 +428,7 @@ impl<'a> NNModel<'a> {
 				optimizer.update(&nd[1..],&self.layers[hl][i],&mut layers[hl][i]);
 				let o = s.o[hl][i];
 				for j in 0..self.units[l].0{
-					layers[hl][i][j-1] = self.layers[hl][i][j-1] - nd[j] * o;
+					layers[hl][i][j-1] = layers[hl][i][j-1] - nd[j] * o;
 				}
 			}
 
