@@ -52,7 +52,7 @@ impl Optimizer for Adagrad {
 		let a = self.a;
 
 		for ((w,wi),(gi,&ei)) in (wout.iter_mut().zip(win)).zip(self.gt.iter_mut().zip(e)) {
-			*gi = ei * ei;
+			*gi += ei * ei;
 			*w = wi - a * ei / (gi.sqrt() + EPS);
 		}
 	}
