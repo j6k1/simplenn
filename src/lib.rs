@@ -411,6 +411,7 @@ impl<'a> NNModel<'a> {
 			};
 
 			let mut nd:Vec<f64> = Vec::with_capacity(self.units[l].0 + 1);
+			nd.resize(self.units[l].0 + 1, 0f64);
 
 			for li in layers[hl].iter_mut() {
 				li.resize(self.units[l].0 + 1,0f64);
