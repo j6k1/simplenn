@@ -477,13 +477,13 @@ impl SnapShot {
 		self.r.clone()
 	}
 }
-pub trait InputReader<E> where E: Error + fmt::Debug {
+pub trait InputReader<E> where E: Error + fmt::Debug, StartupError<E>: From<E> {
 	fn read_vec(&mut self,usize,usize) -> Result<Vec<Vec<f64>>,E>;
 	fn source_exists(&mut self) -> bool;
 }
-pub trait ModelInputReader<E> where E: Error + fmt::Debug {
+pub trait ModelInputReader<E> where E: Error + fmt::Debug, StartupError<E>: From<E> {
 	fn read_model<'a>(&mut self) -> Result<NNModel<'a>, E>;
 }
-pub trait Persistence<E> where E: Error + fmt::Debug {
+pub trait Persistence<E> where E: Error + fmt::Debug, PersistenceError<E>: From<E> {
 	fn save(&mut self,layers:&Vec<Vec<Vec<f64>>>) -> Result<(),E>;
 }
