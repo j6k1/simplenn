@@ -53,7 +53,7 @@ impl<'a,O,E,F> NN<'a,O,E,F> where O: Optimizer, E: LossFunction, F: Fn() -> O {
 	}
 
 	pub fn save<P,ERR>(&mut self,mut persistence:P) -> Result<(),PersistenceError<ERR>>
-		where P: Persistence<ERR>, ERR: Error, PersistenceError<ERR>: From<ERR> {
+		where P: Persistence<ERR>, ERR: Error + fmt::Debug, PersistenceError<ERR>: From<ERR> {
 		persistence.save(&self.model.layers)?;
 
 		Ok(())
@@ -85,7 +85,7 @@ impl<'a> NNModel<'a> {
 												reader:I,bias:f64,
 												initializer:F) ->
 		Result<NNModel<'a>,StartupError<E>>
-		where I: InputReader<E>, F: Fn() -> f64, E: Error, StartupError<E>: From<E> {
+		where I: InputReader<E>, F: Fn() -> f64, E: Error + fmt::Debug, StartupError<E>: From<E> {
 
 		match units.len() {
 			l if l < 2 => {
@@ -132,7 +132,7 @@ impl<'a> NNModel<'a> {
 												reader:I,
 												init_list:Vec<(f64,F)>) ->
 		Result<NNModel<'a>,StartupError<E>>
-		where I: InputReader<E>, F: Fn() -> f64, E: Error, StartupError<E>: From<E> {
+		where I: InputReader<E>, F: Fn() -> f64, E: Error + fmt::Debug, StartupError<E>: From<E> {
 
 		match units.len() {
 			l if l < 2 => {
@@ -179,7 +179,7 @@ impl<'a> NNModel<'a> {
 
 	pub fn with_schema<I,F,E>(iunits:usize,units:Vec<(usize,&'a ActivateF)>,mut reader:I,initializer:F) ->
 		Result<NNModel<'a>,StartupError<E>>
-		where I: InputReader<E>, F: Fn() -> Vec<Vec<Vec<f64>>>, E: Error, StartupError<E>: From<E> {
+		where I: InputReader<E>, F: Fn() -> Vec<Vec<Vec<f64>>>, E: Error + fmt::Debug, StartupError<E>: From<E> {
 
 		match units.len() {
 			l if l < 2 => {
