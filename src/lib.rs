@@ -305,7 +305,8 @@ impl<'a> NNModel<'a> {
 
 		for l in 1..self.units.len() - 1 {
 			let ll = l + 1;
-			let ul:Vec<f64> = Vec::with_capacity(self.units[ll].0 + 1);
+			let mut ul:Vec<f64> = Vec::with_capacity(self.units[ll].0 + 1);
+			ul.resize(self.units[ll].0 + 1, 0f64);
 			u.push(ul);
 			let f:&ActivateF = match self.units[l].1 {
 				Some(f) => f,
@@ -316,7 +317,8 @@ impl<'a> NNModel<'a> {
 				}
 			};
 
-			let ol:Vec<f64> = Vec::with_capacity(self.units[ll].0 + 1);
+			let mut ol:Vec<f64> = Vec::with_capacity(self.units[ll].0 + 1);
+			ol.resize(self.units[ll].0 + 1, 0f64);
 			o.push(ol);
 
 			o[ll][0] = 1f64;
