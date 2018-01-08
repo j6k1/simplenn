@@ -100,14 +100,14 @@ impl ActivateF for FTanh {
 		"tanh"
 	}
 }
-pub struct SoftMax {
+pub struct FSoftMax {
 }
-impl SoftMax {
-	pub fn new() -> SoftMax {
-		SoftMax {}
+impl FSoftMax {
+	pub fn new() -> FSoftMax {
+		FSoftMax {}
 	}
 }
-impl ActivateF for SoftMax {
+impl ActivateF for FSoftMax {
 	fn apply(&self,u:f64,v:&Vec<f64>) -> f64 {
 		let alpha = v.iter().fold(0.0/0.0, |m,v| v.max(m));
 		let numer = (u - alpha).exp();
