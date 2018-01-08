@@ -303,7 +303,7 @@ impl<'a> NNModel<'a> {
 			*oi = f.apply(ui,&u[1]);
 		}
 
-		for l in (1..self.units.len() - 1).rev() {
+		for l in 1..self.units.len() - 1 {
 			let ll = l + 1;
 			let ul:Vec<f64> = Vec::with_capacity(self.units[ll].0 + 1);
 			u.push(ul);
