@@ -398,7 +398,7 @@ impl<'a> NNModel<'a> {
 			}
 		}
 
-		for l in (0..self.units.len()-2).rev() {
+		for l in (1..self.units.len()-1).rev() {
 			let hl = l - 1;
 			let ll = l + 1;
 			let f:&ActivateF = match self.units[1].1 {
