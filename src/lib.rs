@@ -355,8 +355,9 @@ impl<'a> NNModel<'a> {
 		d.resize(self.units.len()-1, 0f64);
 
 		for l in 0..self.units.len() - 1 {
-			let layer:Vec<Vec<f64>> = Vec::with_capacity(self.units[l].0 + 1);
+			let mut layer:Vec<Vec<f64>> = Vec::with_capacity(self.units[l].0 + 1);
 
+			layer.resize(self.units[l].0 + 1,Vec::with_capacity(self.units[l+1].0 + 1));
 			layers.push(layer);
 		}
 
@@ -393,7 +394,7 @@ impl<'a> NNModel<'a> {
 		for j in 0..self.units[hl].0 + 1 {
 			optimizer.update(&d[1..],&self.layers[hl][j],&mut layers[hl][j]);
 			let o = s.o[hl][j];
-			for k in 0..self.units[l].0 {
+			for k in 1..self.units[l].0 {
 				layers[hl][j][k-1] = layers[hl][j][k-1] * o;
 			}
 		}
@@ -427,7 +428,7 @@ impl<'a> NNModel<'a> {
 			for i in 0..self.units[hl].0 + 1 {
 				optimizer.update(&nd[1..],&self.layers[hl][i],&mut layers[hl][i]);
 				let o = s.o[hl][i];
-				for j in 0..self.units[l].0{
+				for j in 1..self.units[l].0 + 1 {
 					layers[hl][i][j-1] = layers[hl][i][j-1] - nd[j] * o;
 				}
 			}
