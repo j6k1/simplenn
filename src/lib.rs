@@ -72,6 +72,7 @@ impl<'a> NNModel<'a> {
 
 	fn new(units:Vec<(usize,Option<&'a ActivateF>)>,layers:Vec<Vec<Vec<f64>>>) -> NNModel<'a> {
 		let mut rnd = rand::XorShiftRng::new_unseeded();
+
 		NNModel {
 			units:units,
 			layers:layers,
@@ -81,7 +82,7 @@ impl<'a> NNModel<'a> {
 
 	pub fn with_bias_and_unit_initializer<I,F,E>(
 												iunits:usize,
-												units:Vec<(usize,&'a ActivateF)>,
+												units:&'a [(usize,&'a ActivateF)],
 												reader:I,bias:f64,
 												initializer:F) ->
 		Result<NNModel<'a>,StartupError<E>>
@@ -128,7 +129,7 @@ impl<'a> NNModel<'a> {
 
 	pub fn with_list_of_bias_and_unit_initializer<I,F,E>(
 												iunits:usize,
-												units:Vec<(usize,&'a ActivateF)>,
+												units:&'a [(usize,&'a ActivateF)],
 												reader:I,
 												init_list:Vec<(f64,F)>) ->
 		Result<NNModel<'a>,StartupError<E>>
@@ -177,7 +178,7 @@ impl<'a> NNModel<'a> {
 		})
 	}
 
-	pub fn with_schema<I,F,E>(iunits:usize,units:Vec<(usize,&'a ActivateF)>,mut reader:I,initializer:F) ->
+	pub fn with_schema<I,F,E>(iunits:usize,units:&'a [(usize,&'a ActivateF)],mut reader:I,initializer:F) ->
 		Result<NNModel<'a>,StartupError<E>>
 		where I: InputReader<E>, F: Fn() -> Vec<Vec<Vec<f64>>>, E: Error + fmt::Debug, StartupError<E>: From<E> {
 
@@ -190,9 +191,10 @@ impl<'a> NNModel<'a> {
 			_ => (),
 		}
 
-		let mut units:Vec<(usize,Option<&'a ActivateF>)> = units.iter()
-														.map(|&(u,f)| (u, Some(f)))
-														.collect();
+		let mut units:Vec<(usize,Option<&'a ActivateF>)> = (&units)
+															.iter()
+															.map(|&(u,f)| (u, Some(f)))
+															.collect();
 
 		units.insert(0, (iunits, None));
 
