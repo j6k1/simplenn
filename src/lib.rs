@@ -84,9 +84,9 @@ impl<'a> NNModel<'a> {
 												iunits:usize,
 												units:&'a [(usize,&'a ActivateF)],
 												reader:I,bias:f64,
-												initializer:F) ->
+												mut initializer:F) ->
 		Result<NNModel<'a>,StartupError<E>>
-		where I: InputReader<E>, F: Fn() -> f64, E: Error + fmt::Debug, StartupError<E>: From<E> {
+		where I: InputReader<E>, F: FnMut() -> f64, E: Error + fmt::Debug, StartupError<E>: From<E> {
 
 		match units.len() {
 			l if l < 2 => {
@@ -131,9 +131,9 @@ impl<'a> NNModel<'a> {
 												iunits:usize,
 												units:&'a [(usize,&'a ActivateF)],
 												reader:I,
-												init_list:Vec<(f64,F)>) ->
+												mut init_list:Vec<(f64,F)>) ->
 		Result<NNModel<'a>,StartupError<E>>
-		where I: InputReader<E>, F: Fn() -> f64, E: Error + fmt::Debug, StartupError<E>: From<E> {
+		where I: InputReader<E>, F: FnMut() -> f64, E: Error + fmt::Debug, StartupError<E>: From<E> {
 
 		match units.len() {
 			l if l < 2 => {
@@ -166,7 +166,9 @@ impl<'a> NNModel<'a> {
 				for _ in 1..sunits[i] + 1 {
 					let mut unit:Vec<f64> = Vec::with_capacity(sunits[i+1]);
 					for _ in 0..sunits[i+1] {
-						unit.push(init_list[i].1());
+						match init_list[i] {
+							(_,ref mut f) => unit.push(f())
+						}
 					}
 					layer.push(unit);
 				}
@@ -178,9 +180,9 @@ impl<'a> NNModel<'a> {
 		})
 	}
 
-	pub fn with_schema<I,F,E>(iunits:usize,units:&'a [(usize,&'a ActivateF)],mut reader:I,initializer:F) ->
+	pub fn with_schema<I,F,E>(iunits:usize,units:&'a [(usize,&'a ActivateF)],mut reader:I,mut initializer:F) ->
 		Result<NNModel<'a>,StartupError<E>>
-		where I: InputReader<E>, F: Fn() -> Vec<Vec<Vec<f64>>>, E: Error + fmt::Debug, StartupError<E>: From<E> {
+		where I: InputReader<E>, F: FnMut() -> Vec<Vec<Vec<f64>>>, E: Error + fmt::Debug, StartupError<E>: From<E> {
 
 		match units.len() {
 			l if l < 2 => {
