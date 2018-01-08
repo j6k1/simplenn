@@ -136,7 +136,6 @@ impl Optimizer for Adam {
 											self.mt.iter_mut().zip(self.vt.iter_mut()))) {
 			*mi = b1 * *mi + (1f64 - self.b1) * ei;
 			*vi = b2 * *vi + (1f64 - self.b2) * ei * ei;
-			*w = wi - a * ei / (vi.sqrt() + EPS);
 
 			*w = wi - a * (*mi / (1f64 - b1t)) / ((*vi / (1f64 - b2t)) + EPS).sqrt();
 		}
