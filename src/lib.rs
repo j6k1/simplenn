@@ -28,19 +28,19 @@ impl<'a,O,E,F> NN<'a,O,E,F> where O: Optimizer, E: LossFunction, F: Fn() -> O {
 		}
 	}
 
-	pub fn promise_of_learn(&mut self,input:Vec<f64>) ->
+	pub fn promise_of_learn(&mut self,input:&Vec<f64>) ->
 		Result<SnapShot,InvalidStateError> {
 
 		self.model.apply(input,|r,o,u| Ok(SnapShot::new(r,o,u,self.model.hash)))
 	}
 
-	pub fn solve(&mut self,input:Vec<f64>) ->
+	pub fn solve(&mut self,input:&Vec<f64>) ->
 		Result<Vec<f64>,InvalidStateError> {
 
 		self.model.solve(input)
 	}
 
-	pub fn learn(&mut self,input:Vec<f64>,t:Vec<f64>) -> Result<(),InvalidStateError>
+	pub fn learn(&mut self,input:&Vec<f64>,t:&Vec<f64>) -> Result<(),InvalidStateError>
 		where O: Optimizer, E: LossFunction {
 
 		Ok(self.model.learn(input,&t,(self.optimizer_creator)(),&self.lossf)?)
@@ -248,7 +248,7 @@ impl<'a> NNModel<'a> {
 		))
 	}
 
-	pub fn apply<F,R>(&self,input:Vec<f64>,after_callback:F) -> Result<R,InvalidStateError>
+	pub fn apply<F,R>(&self,input:&Vec<f64>,after_callback:F) -> Result<R,InvalidStateError>
 		where F: Fn(Vec<f64>,Vec<Vec<f64>>,Vec<Vec<f64>>) -> Result<R,InvalidStateError> {
 
 		if input.len() != self.units[0].0 {
@@ -266,7 +266,7 @@ impl<'a> NNModel<'a> {
 		oi.push(1f64);
 
 		for i in input {
-			oi.push(i);
+			oi.push(*i);
 		}
 
 		o.push(oi);
@@ -434,13 +434,13 @@ impl<'a> NNModel<'a> {
 		Ok(())
 	}
 
-	fn solve(&mut self,input:Vec<f64>) ->
+	fn solve(&mut self,input:&Vec<f64>) ->
 		Result<Vec<f64>,InvalidStateError> {
 
 		self.apply(input,|r,_,_| Ok(r))
 	}
 
-	fn learn<O,E>(&mut self,input:Vec<f64>,t:&Vec<f64>,optimizer:O,lossf:&E) -> Result<(),InvalidStateError>
+	fn learn<O,E>(&mut self,input:&Vec<f64>,t:&Vec<f64>,optimizer:O,lossf:&E) -> Result<(),InvalidStateError>
 		where O: Optimizer, E: LossFunction {
 
 		let s = self.promise_of_learn(input)?;
@@ -448,7 +448,7 @@ impl<'a> NNModel<'a> {
 		self.latter_part_of_learning(t,s,optimizer,lossf)
 	}
 
-	fn promise_of_learn(&mut self,input:Vec<f64>) ->
+	fn promise_of_learn(&mut self,input:&Vec<f64>) ->
 		Result<SnapShot,InvalidStateError> {
 
 		let mut rnd = rand::XorShiftRng::new_unseeded();
