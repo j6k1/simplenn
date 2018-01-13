@@ -13,17 +13,23 @@ use function::activation::*;
 use function::loss::*;
 use function::optimizer::*;
 
-pub struct NN<'a,O,E,F> where O: Optimizer, E: LossFunction, F: Fn() -> O {
+pub struct NN<'a,O,E> where O: Optimizer, E: LossFunction {
 	model:&'a mut NNModel<'a>,
-	optimizer_creator:F,
+	optimizer:O,
 	lossf:E,
 }
 
-impl<'a,O,E,F> NN<'a,O,E,F> where O: Optimizer, E: LossFunction, F: Fn() -> O {
-	pub fn new(model:&'a mut NNModel<'a>,optimizer_creator:F,lossf:E) -> NN<'a,O,E,F> {
+impl<'a,O,E> NN<'a,O,E> where O: Optimizer, E: LossFunction {
+	pub fn new<F>(model:&'a mut NNModel<'a>,optimizer_creator:F,lossf:E) -> NN<'a,O,E>
+		where F: Fn(usize) -> O {
+		let mut size = 0;
+
+		for i in 0..model.units.len() - 1 {
+			size += model.units[i].0 + 1;
+		}
 		NN {
 			model:model,
-			optimizer_creator:optimizer_creator,
+			optimizer:optimizer_creator(size),
 			lossf:lossf,
 		}
 	}
@@ -43,13 +49,13 @@ impl<'a,O,E,F> NN<'a,O,E,F> where O: Optimizer, E: LossFunction, F: Fn() -> O {
 	pub fn learn(&mut self,input:&Vec<f64>,t:&Vec<f64>) -> Result<(),InvalidStateError>
 		where O: Optimizer, E: LossFunction {
 
-		Ok(self.model.learn(input,&t,(self.optimizer_creator)(),&self.lossf)?)
+		Ok(self.model.learn(input,&t,&mut self.optimizer,&self.lossf)?)
 	}
 
 	pub fn latter_part_of_learning(&mut self, t:&Vec<f64>,s:SnapShot) ->
 		Result<(),InvalidStateError> {
 
-		Ok(self.model.latter_part_of_learning(t,s,(self.optimizer_creator)(),&self.lossf)?)
+		Ok(self.model.latter_part_of_learning(t,s,&mut self.optimizer,&self.lossf)?)
 	}
 
 	pub fn save<P,ERR>(&mut self,mut persistence:P) -> Result<(),PersistenceError<ERR>>
@@ -341,7 +347,7 @@ impl<'a> NNModel<'a> {
 		after_callback(r,o,u)
 	}
 
-	fn latter_part_of_learning<O,E>(&mut self, t:&Vec<f64>,s:SnapShot,mut optimizer:O,lossf:&E) ->
+	fn latter_part_of_learning<O,E>(&mut self, t:&Vec<f64>,s:SnapShot,optimizer:&mut O,lossf:&E) ->
 		Result<(),InvalidStateError> where O: Optimizer, E: LossFunction {
 
 		if s.hash != self.hash {
@@ -398,7 +404,7 @@ impl<'a> NNModel<'a> {
 			for k in 1..self.units[l].0 + 1 {
 				e[k-1] = d[k] * o;
 			}
-			optimizer.update(&e,&self.layers[hl][j],&mut layers[hl][j]);
+			optimizer.update((hl,j),&e,&self.layers[hl][j],&mut layers[hl][j]);
 		}
 
 		for l in (1..self.units.len()-1).rev() {
@@ -434,7 +440,7 @@ impl<'a> NNModel<'a> {
 				for j in 1..self.units[l].0 + 1 {
 					e[j-1] - nd[j] * o;
 				}
-				optimizer.update(&e,&self.layers[hl][i],&mut layers[hl][i]);
+				optimizer.update((hl,i),&e,&self.layers[hl][i],&mut layers[hl][i]);
 			}
 
 			d = nd;
@@ -451,7 +457,7 @@ impl<'a> NNModel<'a> {
 		self.apply(input,|r,_,_| Ok(r))
 	}
 
-	fn learn<O,E>(&mut self,input:&Vec<f64>,t:&Vec<f64>,optimizer:O,lossf:&E) -> Result<(),InvalidStateError>
+	fn learn<O,E>(&mut self,input:&Vec<f64>,t:&Vec<f64>,optimizer:&mut O,lossf:&E) -> Result<(),InvalidStateError>
 		where O: Optimizer, E: LossFunction {
 
 		let s = self.promise_of_learn(input)?;
