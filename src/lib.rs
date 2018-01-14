@@ -13,14 +13,14 @@ use function::activation::*;
 use function::loss::*;
 use function::optimizer::*;
 
-pub struct NN<'a,O,E> where O: Optimizer, E: LossFunction {
-	model:&'a mut NNModel<'a>,
+pub struct NN<O,E> where O: Optimizer, E: LossFunction {
+	model:NNModel,
 	optimizer:O,
 	lossf:E,
 }
 
-impl<'a,O,E> NN<'a,O,E> where O: Optimizer, E: LossFunction {
-	pub fn new<F>(model:&'a mut NNModel<'a>,optimizer_creator:F,lossf:E) -> NN<'a,O,E>
+impl<O,E> NN<O,E> where O: Optimizer, E: LossFunction {
+	pub fn new<F>(model:NNModel,optimizer_creator:F,lossf:E) -> NN<O,E>
 		where F: Fn(usize) -> O {
 		let mut size = 0;
 
@@ -65,18 +65,18 @@ impl<'a,O,E> NN<'a,O,E> where O: Optimizer, E: LossFunction {
 		Ok(())
 	}
 }
-pub struct NNModel<'a> {
-	units:Vec<(usize,Option<&'a ActivateF>)>,
+pub struct NNModel {
+	units:Vec<(usize,Option<Box<ActivateF>>)>,
 	layers:Vec<Vec<Vec<f64>>>,
 	hash:u64,
 }
-impl<'a> NNModel<'a> {
-	pub fn load<I,E>(mut reader:I) -> Result<NNModel<'a>, E>
+impl NNModel {
+	pub fn load<I,E>(mut reader:I) -> Result<NNModel, E>
 		where I: ModelInputReader<E>, E: Error, StartupError<E>: From<E> {
 		reader.read_model()
 	}
 
-	fn new(units:Vec<(usize,Option<&'a ActivateF>)>,layers:Vec<Vec<Vec<f64>>>) -> NNModel<'a> {
+	fn new(units:Vec<(usize,Option<Box<ActivateF>>)>,layers:Vec<Vec<Vec<f64>>>) -> NNModel {
 		let mut rnd = rand::XorShiftRng::new_unseeded();
 
 		NNModel {
@@ -88,10 +88,10 @@ impl<'a> NNModel<'a> {
 
 	pub fn with_bias_and_unit_initializer<I,F,E>(
 												iunits:usize,
-												units:&'a [(usize,&'a ActivateF)],
+												units:Vec<(usize,Box<ActivateF>)>,
 												reader:I,bias:f64,
 												mut initializer:F) ->
-		Result<NNModel<'a>,StartupError<E>>
+		Result<NNModel,StartupError<E>>
 		where I: InputReader<E>, F: FnMut() -> f64, E: Error + fmt::Debug, StartupError<E>: From<E> {
 
 		match units.len() {
@@ -135,10 +135,10 @@ impl<'a> NNModel<'a> {
 
 	pub fn with_list_of_bias_and_unit_initializer<I,F,E>(
 												iunits:usize,
-												units:&'a [(usize,&'a ActivateF)],
+												units:Vec<(usize,Box<ActivateF>)>,
 												reader:I,
 												mut init_list:Vec<(f64,F)>) ->
-		Result<NNModel<'a>,StartupError<E>>
+		Result<NNModel,StartupError<E>>
 		where I: InputReader<E>, F: FnMut() -> f64, E: Error + fmt::Debug, StartupError<E>: From<E> {
 
 		match units.len() {
@@ -186,8 +186,8 @@ impl<'a> NNModel<'a> {
 		})
 	}
 
-	pub fn with_schema<I,F,E>(iunits:usize,units:&'a [(usize,&'a ActivateF)],mut reader:I,mut initializer:F) ->
-		Result<NNModel<'a>,StartupError<E>>
+	pub fn with_schema<I,F,E>(iunits:usize,units:Vec<(usize,Box<ActivateF>)>,mut reader:I,mut initializer:F) ->
+		Result<NNModel,StartupError<E>>
 		where I: InputReader<E>, F: FnMut() -> Vec<Vec<Vec<f64>>>, E: Error + fmt::Debug, StartupError<E>: From<E> {
 
 		match units.len() {
@@ -199,9 +199,9 @@ impl<'a> NNModel<'a> {
 			_ => (),
 		}
 
-		let mut units:Vec<(usize,Option<&'a ActivateF>)> = (&units)
-															.iter()
-															.map(|&(u,f)| (u, Some(f)))
+		let mut units:Vec<(usize,Option<Box<ActivateF>>)> = units
+															.into_iter()
+															.map(|(u,f)| (u, Some(f)))
 															.collect();
 
 		units.insert(0, (iunits, None));
@@ -294,8 +294,8 @@ impl<'a> NNModel<'a> {
 		o.push(Vec::with_capacity(self.units[1].0 + 1));
 		o[1].resize(self.units[1].0 + 1, 0f64);
 
-		let f:&ActivateF = match self.units[1].1 {
-			Some(f) => f,
+		let f:&Box<ActivateF> = match self.units[1].1 {
+			Some(ref f) => f,
 			None => {
 				return Err(InvalidStateError::InvalidInput(String::from(
 							"Reference to the activation function object is not set."
@@ -314,8 +314,8 @@ impl<'a> NNModel<'a> {
 			let mut ul:Vec<f64> = Vec::with_capacity(self.units[ll].0 + 1);
 			ul.resize(self.units[ll].0 + 1, 0f64);
 			u.push(ul);
-			let f:&ActivateF = match self.units[l].1 {
-				Some(f) => f,
+			let f:&Box<ActivateF> = match self.units[l].1 {
+				Some(ref f) => f,
 				None => {
 					return Err(InvalidStateError::InvalidInput(String::from(
 								"Reference to the activation function object is not set."
@@ -367,8 +367,8 @@ impl<'a> NNModel<'a> {
 			layers.push(layer);
 		}
 
-		let f:&ActivateF = match self.units[1].1 {
-			Some(f) => f,
+		let f:&Box<ActivateF> = match self.units[1].1 {
+			Some(ref f) => f,
 			None => {
 				return Err(InvalidStateError::InvalidInput(String::from(
 							"Reference to the activation function object is not set."
@@ -384,7 +384,7 @@ impl<'a> NNModel<'a> {
 
 		let hl = self.units.len()-2;
 		let l = self.units.len()-1;
-		match lossf.is_canonical_link(f) {
+		match lossf.is_canonical_link(&f) {
 			true => {
 				for k in 1..self.units[l].0 + 1 {
 					d[k] = s.r[k-1] - t[k-1];
@@ -410,8 +410,8 @@ impl<'a> NNModel<'a> {
 		for l in (1..self.units.len()-1).rev() {
 			let hl = l - 1;
 			let ll = l + 1;
-			let f:&ActivateF = match self.units[1].1 {
-				Some(f) => f,
+			let f:&Box<ActivateF> = match self.units[1].1 {
+				Some(ref f) => f,
 				None => {
 					return Err(InvalidStateError::InvalidInput(String::from(
 								"Reference to the activation function object is not set."
@@ -499,7 +499,7 @@ pub trait InputReader<E> where E: Error + fmt::Debug, StartupError<E>: From<E> {
 	fn source_exists(&mut self) -> bool;
 }
 pub trait ModelInputReader<E> where E: Error + fmt::Debug, StartupError<E>: From<E> {
-	fn read_model<'a>(&mut self) -> Result<NNModel<'a>, E>;
+	fn read_model<'a>(&mut self) -> Result<NNModel, E>;
 }
 pub trait Persistence<E> where E: Error + fmt::Debug, PersistenceError<E>: From<E> {
 	fn save(&mut self,layers:&Vec<Vec<Vec<f64>>>) -> Result<(),E>;
