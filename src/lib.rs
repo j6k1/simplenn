@@ -304,7 +304,7 @@ impl NNModel {
 			let mut ul:Vec<f64> = Vec::with_capacity(self.units[ll].0 + 1);
 			ul.resize(self.units[ll].0 + 1, 0f64);
 			u.push(ul);
-			let f:&Box<ActivateF> = match self.units[l].1 {
+			let f:&Box<ActivateF> = match self.units[ll].1 {
 				Some(ref f) => f,
 				None => {
 					return Err(InvalidStateError::InvalidInput(String::from(
@@ -357,7 +357,7 @@ impl NNModel {
 			layers.push(layer);
 		}
 
-		let f:&Box<ActivateF> = match self.units[1].1 {
+		let f:&Box<ActivateF> = match self.units[self.units.len()-1].1 {
 			Some(ref f) => f,
 			None => {
 				return Err(InvalidStateError::InvalidInput(String::from(
@@ -400,7 +400,7 @@ impl NNModel {
 		for l in (1..self.units.len()-1).rev() {
 			let hl = l - 1;
 			let ll = l + 1;
-			let f:&Box<ActivateF> = match self.units[1].1 {
+			let f:&Box<ActivateF> = match self.units[l].1 {
 				Some(ref f) => f,
 				None => {
 					return Err(InvalidStateError::InvalidInput(String::from(
