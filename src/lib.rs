@@ -275,13 +275,13 @@ impl NNModel {
 
 		u[1].resize(self.units[1].0 + 1, 0f64);
 
-		for k in 1..self.units[1].0 + 1 {
-			for j in 0..self.units[0].0 + 1 {
-				u[1][k] += o[0][j] * self.layers[0][j][k-1];
+		for (o,wl) in o[0].iter().zip(&self.layers[0]) {
+			for (u,w) in u[1].iter_mut().skip(1).zip(wl) {
+				*u += o * w;
 			}
 		}
 
-		o.push(Vec::with_capacity(self.units[1].0 + 1));
+		o.	push(Vec::with_capacity(self.units[1].0 + 1));
 		o[1].resize(self.units[1].0 + 1, 0f64);
 
 		let f:&Box<ActivateF> = match self.units[1].1 {
@@ -319,12 +319,16 @@ impl NNModel {
 
 			o[ll][0] = 1f64;
 
-			for k in 1..self.units[ll].0 + 1 {
-				for j in 0..self.units[l].0 + 1 {
-					u[ll][k] = u[ll][k] + o[l][j] * self.layers[l][j][k-1];
+			for (o,wl) in o[l].iter().zip(&self.layers[l]) {
+				for (u,w) in u[ll].iter_mut().skip(1).zip(wl) {
+					*u = *u + o * w;
 				}
+			}
 
-				o[ll][k] = f.apply(u[ll][k],&u[ll]);
+			let u = &u[ll];
+
+			for (o,ui) in o[ll].iter_mut().zip(u) {
+				*o = f.apply(*ui,u);
 			}
 		}
 
