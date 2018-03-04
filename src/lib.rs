@@ -327,7 +327,7 @@ impl NNModel {
 
 			let u = &u[ll];
 
-			for (o,ui) in o[ll].iter_mut().zip(u) {
+			for (o,ui) in o[ll].iter_mut().skip(1).zip(u.iter().skip(1)) {
 				*o = f.apply(*ui,u);
 			}
 		}
