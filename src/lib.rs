@@ -432,7 +432,7 @@ impl NNModel {
 				let mut e:Vec<f64> = Vec::with_capacity(self.units[hl].0 + 1);
 				e.resize(self.units[l].0,0f64);
 				for j in 1..self.units[l].0 + 1 {
-					e[j-1] - nd[j] * o;
+					e[j-1] = nd[j] * o;
 				}
 				optimizer.update((hl,i),&e,&self.layers[hl][i],&mut layers[hl][i]);
 			}
