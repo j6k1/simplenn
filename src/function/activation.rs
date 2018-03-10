@@ -1,4 +1,4 @@
-pub trait ActivateF {
+pub trait ActivateF: Send + 'static {
 	fn apply(&self,u:f64,v:&Vec<f64>) -> f64;
 	fn derive(&self,e:f64) -> f64;
 	fn kind(&self) -> &str;
