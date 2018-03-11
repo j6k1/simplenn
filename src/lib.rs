@@ -469,7 +469,7 @@ impl NNModel {
 	}
 }
 pub struct SnapShot {
-	r:Vec<f64>,
+	pub r:Vec<f64>,
 	o:Vec<Vec<f64>>,
 	u:Vec<Vec<f64>>,
 	hash:u64,
