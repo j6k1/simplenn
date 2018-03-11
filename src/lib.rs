@@ -204,7 +204,7 @@ impl NNModel {
 
 				for i in 0..units.len()-1 {
 					let size = match units[i] {
-						(size,_) => size,
+						(size,_) => size + 1,
 					};
 					let sizeb = match units[i+1] {
 						(size,_) => size,
@@ -215,7 +215,6 @@ impl NNModel {
 			},
 			false => initializer(),
 		};
-
 		if layers.len() != units.len() - 1 {
 			return Err(StartupError::InvalidConfiguration(format!("The layers count do not match. (units = {}, layers = {})", units.len(), layers.len())));
 		}
@@ -250,7 +249,6 @@ impl NNModel {
 
 	pub fn apply<F,R>(&self,input:&Vec<f64>,after_callback:F) -> Result<R,InvalidStateError>
 		where F: Fn(Vec<f64>,Vec<Vec<f64>>,Vec<Vec<f64>>) -> Result<R,InvalidStateError> {
-
 		if input.len() != self.units[0].0 {
 			return Err(InvalidStateError::InvalidInput(String::from(
 				"The inputs to the input layer is invalid (the count of inputs must be the count of units)")));

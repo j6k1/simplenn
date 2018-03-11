@@ -43,7 +43,14 @@ impl TextFileInputReader {
 			Some(ref mut reader) => {
 				let mut buf = String::new();
 				reader.read_line(&mut buf)?;
-				Ok(buf)
+
+				buf = buf.trim().to_string();
+				if buf.is_empty() {
+					Err(ConfigReadError::InavalidState(String::from(
+						"An error occurred while reading the input. The line is empty.")))
+				} else {
+					Ok(buf)
+				}
 			},
 			None => Err(ConfigReadError::InavalidState(String::from(
 													"The file does not exist yet."))),
@@ -53,6 +60,7 @@ impl TextFileInputReader {
 	fn next_token(&mut self) -> Result<String, ConfigReadError> {
 		let t = match self.line {
 			None => {
+				self.index = 0;
 				let mut buf = self.read_line()?;
 
 				while match &*buf {
@@ -62,13 +70,12 @@ impl TextFileInputReader {
 						_ => false,
 					}
 				} {
-					buf = self.read_line()?.trim().to_string();
+					buf = self.read_line()?;
 				}
 
 				let line = buf.split(" ").map(|s| s.to_string()).collect::<Vec<String>>();
 				let t = (&line[self.index]).clone();
 				self.line = Some(line);
-				self.index = 0;
 				t
 			},
 			Some(ref line) => {
@@ -82,7 +89,9 @@ impl TextFileInputReader {
 			Some(ref line) if self.index >= line.len() => {
 				true
 			},
-			Some(_) => false,
+			Some(_) => {
+				false
+			}
 			None => false,
 		} {
 			self.line = None;
