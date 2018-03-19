@@ -42,12 +42,13 @@ impl TextFileInputReader {
 		match self.reader {
 			Some(ref mut reader) => {
 				let mut buf = String::new();
-				reader.read_line(&mut buf)?;
+				let n = reader.read_line(&mut buf)?;
 
 				buf = buf.trim().to_string();
-				if buf.is_empty() {
+
+				if n == 0 {
 					Err(ConfigReadError::InavalidState(String::from(
-						"An error occurred while reading the input. The line is empty.")))
+						"End of input has been reached.")))
 				} else {
 					Ok(buf)
 				}
