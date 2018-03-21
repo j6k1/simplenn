@@ -5,3 +5,4 @@ authors = ["jinpu"]
 
 [dependencies]
 rand = "0.4"
+ocl = "0.17"

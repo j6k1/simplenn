@@ -1,4 +1,6 @@
+#[link(name="opencl")]
 extern crate rand;
+extern crate ocl;
 
 pub mod function;
 pub mod error;
@@ -8,6 +10,12 @@ use std::fmt;
 use error::*;
 use std::error::Error;
 use rand::Rng;
+
+use ocl::Buffer;
+use ocl::MemFlags;
+use ocl::ProQue;
+use ocl::SpatialDims;
+use ocl::Kernel;
 
 use function::activation::*;
 use function::loss::*;
@@ -89,6 +97,8 @@ pub struct NNModel {
 	units:Vec<(usize,Option<Box<ActivateF>>)>,
 	layers:Vec<Vec<Vec<f64>>>,
 	hash:u64,
+	pro_que:Vec<ProQue>,
+	kernels:Vec<Kernel>,
 }
 impl NNModel {
 	pub fn load<I,E>(mut reader:I) -> Result<NNModel, E>
@@ -96,13 +106,15 @@ impl NNModel {
 		reader.read_model()
 	}
 
-	fn new(units:Vec<(usize,Option<Box<ActivateF>>)>,layers:Vec<Vec<Vec<f64>>>) -> NNModel {
+	fn new(units:Vec<(usize,Option<Box<ActivateF>>)>,
+			layers:Vec<Vec<Vec<f64>>>,pro_que:Vec<ProQue>,kernels:Vec<Kernel>) -> NNModel {
 		let mut rnd = rand::XorShiftRng::new_unseeded();
-
 		NNModel {
 			units:units,
 			layers:layers,
 			hash:rnd.next_u64(),
+			pro_que:pro_que,
+			kernels:kernels,
 		}
 	}
 
@@ -158,7 +170,7 @@ impl NNModel {
 			let mut layers:Vec<Vec<Vec<f64>>> = Vec::with_capacity(sunits.len());
 
 			for i in 0..sunits.len() - 1 {
-				let mut layer:Vec<Vec<f64>> = Vec::with_capacity(sunits[i]);
+				let mut layer:Vec<Vec<f64>> = Vec::with_capacity(sunits[i] + 1);
 
 				let mut unit:Vec<f64> = Vec::with_capacity(sunits[i+1]);
 
@@ -241,9 +253,54 @@ impl NNModel {
 			}
 		}
 
+		let src = r#"
+			__kernel void vec_mul(
+				unsigned long units,
+				unsigned long width,
+				__global double *o,
+				__global double *w,
+				__global double *u) {
+				size_t x = get_global_id(0);
+				size_t y = get_global_id(1);
+				size_t i = x * y;
+
+				if (i < width) {
+					unsigned long l = units * width;
+					unsigned long j;
+					unsigned long k;
+					for(j = i,k=0; j < l; j+=width,k++) {
+						u[i] = u[i] + o[k] * w[j];
+					}
+				}
+			}
+		"#;
+
+		let mut pro_que:Vec<ProQue> = Vec::new();
+		let mut kernels:Vec<Kernel> = Vec::new();
+
+		for i in 1..units.len() {
+			let global_work_size = SpatialDims::new(
+									Some(units[i-1].0+1),
+									Some(units[i].0),Some(1)).unwrap();
+			let pq = ProQue::builder()
+							.src(src)
+							.dims(global_work_size)
+							.build().expect("Build ProQue");
+			pro_que.push(pq.clone());
+
+			kernels.push(pq.create_kernel("vec_mul")
+									.unwrap()
+									.arg_scl_named::<usize>("units",None)
+									.arg_scl_named::<usize>("width",None)
+									.arg_buf_named::<f64,Buffer<f64>>("o",None)
+									.arg_buf_named::<f64,Buffer<f64>>("w",None)
+									.arg_buf_named::<f64,Buffer<f64>>("u",None));
+		}
 		Ok(NNModel::new(
 			units,
 			layers,
+			pro_que,
+			kernels,
 		))
 	}
 
@@ -269,17 +326,56 @@ impl NNModel {
 
 		o.push(oi);
 
-		u.push(Vec::with_capacity(self.units[1].0 + 1));
+		let mut ul = Vec::with_capacity(self.units[1].0 + 1);
 
-		u[1].resize(self.units[1].0 + 1, 0f64);
+		ul.resize(self.units[1].0 + 1, 0f64);
 
-		for (o,wl) in o[0].iter().zip(&self.layers[0]) {
-			for (u,w) in u[1].iter_mut().skip(1).zip(wl) {
-				*u += o * w;
+		{
+			let mut w:Vec<f64> = Vec::with_capacity((self.units[0].0+1)*self.units[1].0);
+
+			for wi in &self.layers[0] {
+				w.extend_from_slice(wi);
 			}
+			let o_buffer:Buffer<f64> = Buffer::builder()
+												.queue(self.pro_que[0].queue().clone())
+												.flags(MemFlags::new().read_only().copy_host_ptr())
+												.len(self.units[0].0+1)
+												.host_data(&o[0])
+												.build().unwrap();
+			let w_buffer:Buffer<f64> = Buffer::builder()
+												.queue(self.pro_que[0].queue().clone())
+												.flags(MemFlags::new().read_only().copy_host_ptr())
+												.len((self.units[0].0+1) * self.units[1].0)
+												.host_data(&w)
+												.build().unwrap();
+			let u_buffer:Buffer<f64> = Buffer::builder()
+												.queue(self.pro_que[0].queue().clone())
+												.flags(MemFlags::new().read_write().copy_host_ptr())
+												.len(self.units[1].0)
+												.host_data(&ul[1..])
+												.build().unwrap();
+			let kernel = self.kernels[0]
+							.clone()
+							.set_arg_scl_named("units", self.units[0].0 + 1 as usize)
+							.unwrap()
+							.set_arg_scl_named("width", self.units[1].0 as usize)
+							.unwrap()
+							.set_arg_buf_named("o",Some(&o_buffer))
+							.unwrap()
+							.set_arg_buf_named("w",Some(&w_buffer))
+							.unwrap()
+							.set_arg_buf_named("u",Some(&u_buffer))
+							.unwrap()
+							.clone();
+
+			unsafe { kernel.enq().unwrap() }
+
+			u_buffer.read(&mut ul[1..]).enq().unwrap();
 		}
 
-		o.	push(Vec::with_capacity(self.units[1].0 + 1));
+		u.push(ul);
+
+		o.push(Vec::with_capacity(self.units[1].0 + 1));
 		o[1].resize(self.units[1].0 + 1, 0f64);
 
 		let f:&Box<ActivateF> = match self.units[1].1 {
@@ -301,7 +397,7 @@ impl NNModel {
 			let ll = l + 1;
 			let mut ul:Vec<f64> = Vec::with_capacity(self.units[ll].0 + 1);
 			ul.resize(self.units[ll].0 + 1, 0f64);
-			u.push(ul);
+
 			let f:&Box<ActivateF> = match self.units[ll].1 {
 				Some(ref f) => f,
 				None => {
@@ -316,12 +412,50 @@ impl NNModel {
 			o.push(ol);
 
 			o[ll][0] = 1f64;
+			{
+				let mut w:Vec<f64> = Vec::with_capacity((self.units[l].0+1) * self.units[ll].0);
 
-			for (o,wl) in o[l].iter().zip(&self.layers[l]) {
-				for (u,w) in u[ll].iter_mut().skip(1).zip(wl) {
-					*u = *u + o * w;
+				for wi in &self.layers[l] {
+					w.extend_from_slice(wi);
 				}
+				let o_buffer:Buffer<f64> = Buffer::builder()
+													.queue(self.pro_que[l].queue().clone())
+													.flags(MemFlags::new().read_only().copy_host_ptr())
+													.len(self.units[l].0+1)
+													.host_data(&o[l])
+													.build().unwrap();
+				let w_buffer:Buffer<f64> = Buffer::builder()
+													.queue(self.pro_que[l].queue().clone())
+													.flags(MemFlags::new().read_only().copy_host_ptr())
+													.len((self.units[l].0+1) * self.units[ll].0)
+													.host_data(&w)
+													.build().unwrap();
+				let u_buffer:Buffer<f64> = Buffer::builder()
+													.queue(self.pro_que[l].queue().clone())
+													.flags(MemFlags::new().read_write().copy_host_ptr())
+													.len(self.units[ll].0)
+													.host_data(&ul[1..])
+													.build().unwrap();
+				let kernel = self.kernels[l]
+								.clone()
+								.set_arg_scl_named("units", self.units[l].0 + 1 as usize)
+								.unwrap()
+								.set_arg_scl_named("width",self.units[ll].0 as usize)
+								.unwrap()
+								.set_arg_buf_named("o",Some(&o_buffer))
+								.unwrap()
+								.set_arg_buf_named("w",Some(&w_buffer))
+								.unwrap()
+								.set_arg_buf_named("u",Some(&u_buffer))
+								.unwrap()
+								.clone();
+
+				unsafe { kernel.enq().unwrap() }
+
+				u_buffer.read(&mut ul[1..]).enq().unwrap();
 			}
+
+			u.push(ul);
 
 			let u = &u[ll];
 
@@ -329,7 +463,6 @@ impl NNModel {
 				*o = f.apply(*ui,u);
 			}
 		}
-
 		let mut r:Vec<f64> = Vec::with_capacity(self.units[self.units.len()-1].0);
 
 		for &oi in o[self.units.len()-1].iter().skip(1) {
@@ -412,7 +545,7 @@ impl NNModel {
 			};
 
 			for li in layers[hl].iter_mut() {
-				li.resize(self.units[l].0 + 1,0f64);
+				li.resize(self.units[l].0,0f64);
 			}
 
 			let mut nd:Vec<f64> = Vec::with_capacity(self.units[l].0 + 1);
@@ -434,10 +567,8 @@ impl NNModel {
 				}
 				optimizer.update((hl,i),&e,&self.layers[hl][i],&mut layers[hl][i]);
 			}
-
 			d = nd;
 		}
-
 		self.layers = layers;
 
 		Ok(())
