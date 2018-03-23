@@ -98,7 +98,7 @@ pub struct NNModel {
 	layers:Vec<Vec<Vec<f64>>>,
 	hash:u64,
 	pro_que:Vec<ProQue>,
-	kernels:Vec<Kernel>,
+	kernels:Vec<(Kernel,Kernel)>,
 }
 impl NNModel {
 	pub fn load<I,E>(mut reader:I) -> Result<NNModel, E>
@@ -107,7 +107,7 @@ impl NNModel {
 	}
 
 	fn new(units:Vec<(usize,Option<Box<ActivateF>>)>,
-			layers:Vec<Vec<Vec<f64>>>,pro_que:Vec<ProQue>,kernels:Vec<Kernel>) -> NNModel {
+			layers:Vec<Vec<Vec<f64>>>,pro_que:Vec<ProQue>,kernels:Vec<(Kernel,Kernel)>) -> NNModel {
 		let mut rnd = rand::XorShiftRng::new_unseeded();
 		NNModel {
 			units:units,
@@ -260,23 +260,35 @@ impl NNModel {
 				__global double *o,
 				__global double *w,
 				__global double *u) {
-				size_t x = get_global_id(0);
-				size_t y = get_global_id(1);
-				size_t i = x * y;
+				size_t y = get_global_id(0);
+				size_t x = get_global_id(1);
+				size_t i = x * width + y;
+				size_t l = units * width;
 
-				if (i < width) {
-					unsigned long l = units * width;
-					unsigned long j;
-					unsigned long k;
-					for(j = i,k=0; j < l; j+=width,k++) {
-						u[i] = u[i] + o[k] * w[j];
-					}
+				if (i < l) {
+					u[i] = o[y] * w[i];
 				}
+			}
+
+			__kernel void vec_fold(
+				unsigned long units,
+				unsigned long width,
+				__global double *u,
+				__global double *ur) {
+				size_t x = get_global_id(1);
+				size_t y;
+				double r = 0.0;
+
+				for(y=0; y < units; y++) {
+					r += u[x * width + y];
+				}
+
+				ur[x] = r;
 			}
 		"#;
 
 		let mut pro_que:Vec<ProQue> = Vec::new();
-		let mut kernels:Vec<Kernel> = Vec::new();
+		let mut kernels:Vec<(Kernel,Kernel)> = Vec::new();
 
 		for i in 1..units.len() {
 			let global_work_size = SpatialDims::new(
@@ -288,13 +300,20 @@ impl NNModel {
 							.build().expect("Build ProQue");
 			pro_que.push(pq.clone());
 
-			kernels.push(pq.create_kernel("vec_mul")
+			kernels.push((pq.create_kernel("vec_mul")
 									.unwrap()
 									.arg_scl_named::<usize>("units",None)
 									.arg_scl_named::<usize>("width",None)
 									.arg_buf_named::<f64,Buffer<f64>>("o",None)
 									.arg_buf_named::<f64,Buffer<f64>>("w",None)
-									.arg_buf_named::<f64,Buffer<f64>>("u",None));
+									.arg_buf_named::<f64,Buffer<f64>>("u",None),
+				pq.create_kernel("vec_fold")
+									.unwrap()
+									.arg_scl_named::<usize>("units",None)
+									.arg_scl_named::<usize>("width",None)
+									.arg_buf_named::<f64,Buffer<f64>>("u",None)
+									.arg_buf_named::<f64,Buffer<f64>>("ur",None)
+			));
 		}
 		Ok(NNModel::new(
 			units,
@@ -350,11 +369,10 @@ impl NNModel {
 												.build().unwrap();
 			let u_buffer:Buffer<f64> = Buffer::builder()
 												.queue(self.pro_que[0].queue().clone())
-												.flags(MemFlags::new().read_write().copy_host_ptr())
-												.len(self.units[1].0)
-												.host_data(&ul[1..])
+												.flags(MemFlags::new().read_write())
+												.len((self.units[0].0+1) * self.units[1].0)
 												.build().unwrap();
-			let kernel = self.kernels[0]
+			let kernel = self.kernels[0].0
 							.clone()
 							.set_arg_scl_named("units", self.units[0].0 + 1 as usize)
 							.unwrap()
@@ -370,7 +388,26 @@ impl NNModel {
 
 			unsafe { kernel.enq().unwrap() }
 
-			u_buffer.read(&mut ul[1..]).enq().unwrap();
+			let ur_buffer:Buffer<f64> = Buffer::builder()
+												.queue(self.pro_que[0].queue().clone())
+												.flags(MemFlags::new().read_write())
+												.len(self.units[1].0)
+												.build().unwrap();
+			let kernel = self.kernels[0].1
+							.clone()
+							.set_arg_scl_named("units", self.units[0].0 + 1 as usize)
+							.unwrap()
+							.set_arg_scl_named("width", self.units[1].0 as usize)
+							.unwrap()
+							.set_arg_buf_named("u",Some(&u_buffer))
+							.unwrap()
+							.set_arg_buf_named("ur",Some(&ur_buffer))
+							.unwrap()
+							.clone();
+
+			unsafe { kernel.enq().unwrap() }
+
+			ur_buffer.read(&mut ul[1..]).enq().unwrap();
 		}
 
 		u.push(ul);
@@ -432,11 +469,10 @@ impl NNModel {
 													.build().unwrap();
 				let u_buffer:Buffer<f64> = Buffer::builder()
 													.queue(self.pro_que[l].queue().clone())
-													.flags(MemFlags::new().read_write().copy_host_ptr())
-													.len(self.units[ll].0)
-													.host_data(&ul[1..])
+													.flags(MemFlags::new().read_write())
+													.len((self.units[0].0+1) * self.units[ll].0)
 													.build().unwrap();
-				let kernel = self.kernels[l]
+				let kernel = self.kernels[l].0
 								.clone()
 								.set_arg_scl_named("units", self.units[l].0 + 1 as usize)
 								.unwrap()
@@ -452,7 +488,25 @@ impl NNModel {
 
 				unsafe { kernel.enq().unwrap() }
 
-				u_buffer.read(&mut ul[1..]).enq().unwrap();
+				let ur_buffer:Buffer<f64> = Buffer::builder()
+													.queue(self.pro_que[l].queue().clone())
+													.flags(MemFlags::new().read_write())
+													.len(self.units[ll].0)
+													.build().unwrap();
+
+				let kernel = self.kernels[l].1
+								.clone()
+								.set_arg_scl_named("units", self.units[l].0 + 1 as usize)
+								.unwrap()
+								.set_arg_scl_named("width",self.units[ll].0 as usize)
+								.unwrap()
+								.set_arg_buf_named("u",Some(&u_buffer))
+								.unwrap()
+								.set_arg_buf_named("ur",Some(&ur_buffer))
+								.unwrap()
+								.clone();
+
+				ur_buffer.read(&mut ul[1..]).enq().unwrap();
 			}
 
 			u.push(ul);
