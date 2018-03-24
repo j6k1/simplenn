@@ -357,21 +357,24 @@ impl NNModel {
 			}
 			let o_buffer:Buffer<f64> = Buffer::builder()
 												.queue(self.pro_que[0].queue().clone())
-												.flags(MemFlags::new().read_only().copy_host_ptr())
+												.flags(MemFlags::new().use_host_ptr().read_only())
 												.len(self.units[0].0+1)
 												.host_data(&o[0])
 												.build().unwrap();
+
 			let w_buffer:Buffer<f64> = Buffer::builder()
 												.queue(self.pro_que[0].queue().clone())
-												.flags(MemFlags::new().read_only().copy_host_ptr())
+												.flags(MemFlags::new().use_host_ptr().read_only())
 												.len((self.units[0].0+1) * self.units[1].0)
 												.host_data(&w)
 												.build().unwrap();
+
 			let u_buffer:Buffer<f64> = Buffer::builder()
 												.queue(self.pro_que[0].queue().clone())
-												.flags(MemFlags::new().read_write())
+												.flags(MemFlags::new().alloc_host_ptr().read_write())
 												.len((self.units[0].0+1) * self.units[1].0)
 												.build().unwrap();
+
 			let kernel = self.kernels[0].0
 							.clone()
 							.set_arg_scl_named("units", self.units[0].0 + 1 as usize)
@@ -390,9 +393,10 @@ impl NNModel {
 
 			let ur_buffer:Buffer<f64> = Buffer::builder()
 												.queue(self.pro_que[0].queue().clone())
-												.flags(MemFlags::new().read_write())
+												.flags(MemFlags::new().read_write().alloc_host_ptr())
 												.len(self.units[1].0)
 												.build().unwrap();
+
 			let kernel = self.kernels[0].1
 							.clone()
 							.set_arg_scl_named("units", self.units[0].0 + 1 as usize)
@@ -407,7 +411,15 @@ impl NNModel {
 
 			unsafe { kernel.enq().unwrap() }
 
-			ur_buffer.read(&mut ul[1..]).enq().unwrap();
+			unsafe {
+				let p = ur_buffer.map()
+										.len(self.units[1].0)
+										.read().enq().unwrap().as_ptr();
+
+				for i in 1..ul.len() {
+					ul[i] = *p.offset(i as isize - 1 as isize);
+				}
+			}
 		}
 
 		u.push(ul);
@@ -457,19 +469,22 @@ impl NNModel {
 				}
 				let o_buffer:Buffer<f64> = Buffer::builder()
 													.queue(self.pro_que[l].queue().clone())
-													.flags(MemFlags::new().read_only().copy_host_ptr())
+													.flags(MemFlags::new().read_only().use_host_ptr())
 													.len(self.units[l].0+1)
 													.host_data(&o[l])
 													.build().unwrap();
+
 				let w_buffer:Buffer<f64> = Buffer::builder()
 													.queue(self.pro_que[l].queue().clone())
-													.flags(MemFlags::new().read_only().copy_host_ptr())
+													.flags(MemFlags::new().read_only().use_host_ptr())
 													.len((self.units[l].0+1) * self.units[ll].0)
 													.host_data(&w)
 													.build().unwrap();
+
+
 				let u_buffer:Buffer<f64> = Buffer::builder()
 													.queue(self.pro_que[l].queue().clone())
-													.flags(MemFlags::new().read_write())
+													.flags(MemFlags::new().read_write().alloc_host_ptr())
 													.len((self.units[0].0+1) * self.units[ll].0)
 													.build().unwrap();
 				let kernel = self.kernels[l].0
@@ -490,7 +505,7 @@ impl NNModel {
 
 				let ur_buffer:Buffer<f64> = Buffer::builder()
 													.queue(self.pro_que[l].queue().clone())
-													.flags(MemFlags::new().read_write())
+													.flags(MemFlags::new().read_write().alloc_host_ptr())
 													.len(self.units[ll].0)
 													.build().unwrap();
 
@@ -506,7 +521,17 @@ impl NNModel {
 								.unwrap()
 								.clone();
 
-				ur_buffer.read(&mut ul[1..]).enq().unwrap();
+				unsafe { ur_buffer.map().read().enq().unwrap(); }
+
+				unsafe {
+					let p = ur_buffer.map()
+										.len(self.units[ll].0)
+										.read().enq().unwrap().as_ptr();
+
+					for i in 1..ul.len() {
+						ul[i] = *p.offset(i as isize - 1 as isize);
+					}
+				}
 			}
 
 			u.push(ul);
