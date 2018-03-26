@@ -98,7 +98,7 @@ pub struct NNModel {
 	layers:Vec<Vec<Vec<f64>>>,
 	hash:u64,
 	pro_que:Vec<ProQue>,
-	kernels:Vec<(Kernel,Kernel)>,
+	kernels:Vec<Kernel>,
 }
 impl NNModel {
 	pub fn load<I,E>(mut reader:I) -> Result<NNModel, E>
@@ -107,7 +107,7 @@ impl NNModel {
 	}
 
 	fn new(units:Vec<(usize,Option<Box<ActivateF>>)>,
-			layers:Vec<Vec<Vec<f64>>>,pro_que:Vec<ProQue>,kernels:Vec<(Kernel,Kernel)>) -> NNModel {
+			layers:Vec<Vec<Vec<f64>>>,pro_que:Vec<ProQue>,kernels:Vec<Kernel>) -> NNModel {
 		let mut rnd = rand::XorShiftRng::new_unseeded();
 		NNModel {
 			units:units,
@@ -256,64 +256,36 @@ impl NNModel {
 		let src = r#"
 			__kernel void vec_mul(
 				unsigned long units,
-				unsigned long width,
-				__global double *o,
+				double o,
 				__global double *w,
 				__global double *u) {
-				size_t y = get_global_id(0);
-				size_t x = get_global_id(1);
-				size_t i = x * width + y;
-				size_t l = units * width;
+				size_t i = get_global_id(0);
 
-				if (i < l) {
-					u[i] = o[y] * w[i];
+				if (i < units) {
+					u[i] = u[i] + o * w[i];
 				}
-			}
-
-			__kernel void vec_fold(
-				unsigned long units,
-				unsigned long width,
-				__global double *u,
-				__global double *ur) {
-				size_t x = get_global_id(1);
-				size_t y;
-				double r = 0.0;
-
-				for(y=0; y < units; y++) {
-					r += u[x * width + y];
-				}
-
-				ur[x] = r;
 			}
 		"#;
 
 		let mut pro_que:Vec<ProQue> = Vec::new();
-		let mut kernels:Vec<(Kernel,Kernel)> = Vec::new();
+		let mut kernels:Vec<Kernel> = Vec::new();
 
 		for i in 1..units.len() {
 			let global_work_size = SpatialDims::new(
-									Some(units[i-1].0+1),
-									Some(units[i].0),Some(1)).unwrap();
+									Some(units[i].0),
+									Some(1),Some(1)).unwrap();
 			let pq = ProQue::builder()
 							.src(src)
 							.dims(global_work_size)
 							.build().expect("Build ProQue");
 			pro_que.push(pq.clone());
 
-			kernels.push((pq.create_kernel("vec_mul")
+			kernels.push(pq.create_kernel("vec_mul")
 									.unwrap()
 									.arg_scl_named::<usize>("units",None)
-									.arg_scl_named::<usize>("width",None)
-									.arg_buf_named::<f64,Buffer<f64>>("o",None)
+									.arg_scl_named::<f64>("o",None)
 									.arg_buf_named::<f64,Buffer<f64>>("w",None)
-									.arg_buf_named::<f64,Buffer<f64>>("u",None),
-				pq.create_kernel("vec_fold")
-									.unwrap()
-									.arg_scl_named::<usize>("units",None)
-									.arg_scl_named::<usize>("width",None)
-									.arg_buf_named::<f64,Buffer<f64>>("u",None)
-									.arg_buf_named::<f64,Buffer<f64>>("ur",None)
-			));
+									.arg_buf_named::<f64,Buffer<f64>>("u",None));
 		}
 		Ok(NNModel::new(
 			units,
@@ -350,76 +322,36 @@ impl NNModel {
 		ul.resize(self.units[1].0 + 1, 0f64);
 
 		{
-			let mut w:Vec<f64> = Vec::with_capacity((self.units[0].0+1)*self.units[1].0);
-
-			for wi in &self.layers[0] {
-				w.extend_from_slice(wi);
-			}
-			let o_buffer:Buffer<f64> = Buffer::builder()
-												.queue(self.pro_que[0].queue().clone())
-												.flags(MemFlags::new().use_host_ptr().read_only())
-												.len(self.units[0].0+1)
-												.host_data(&o[0])
-												.build().unwrap();
-
-			let w_buffer:Buffer<f64> = Buffer::builder()
-												.queue(self.pro_que[0].queue().clone())
-												.flags(MemFlags::new().use_host_ptr().read_only())
-												.len((self.units[0].0+1) * self.units[1].0)
-												.host_data(&w)
-												.build().unwrap();
-
 			let u_buffer:Buffer<f64> = Buffer::builder()
 												.queue(self.pro_que[0].queue().clone())
 												.flags(MemFlags::new().alloc_host_ptr().read_write())
-												.len((self.units[0].0+1) * self.units[1].0)
-												.build().unwrap();
-
-			let kernel = self.kernels[0].0
-							.clone()
-							.set_arg_scl_named("units", self.units[0].0 + 1 as usize)
-							.unwrap()
-							.set_arg_scl_named("width", self.units[1].0 as usize)
-							.unwrap()
-							.set_arg_buf_named("o",Some(&o_buffer))
-							.unwrap()
-							.set_arg_buf_named("w",Some(&w_buffer))
-							.unwrap()
-							.set_arg_buf_named("u",Some(&u_buffer))
-							.unwrap()
-							.clone();
-
-			unsafe { kernel.enq().unwrap() }
-
-			let ur_buffer:Buffer<f64> = Buffer::builder()
-												.queue(self.pro_que[0].queue().clone())
-												.flags(MemFlags::new().read_write().alloc_host_ptr())
 												.len(self.units[1].0)
 												.build().unwrap();
 
-			let kernel = self.kernels[0].1
-							.clone()
-							.set_arg_scl_named("units", self.units[0].0 + 1 as usize)
-							.unwrap()
-							.set_arg_scl_named("width", self.units[1].0 as usize)
-							.unwrap()
-							.set_arg_buf_named("u",Some(&u_buffer))
-							.unwrap()
-							.set_arg_buf_named("ur",Some(&ur_buffer))
-							.unwrap()
-							.clone();
+			for (o,wi) in o[0].iter().zip(&self.layers[0]) {
+				let w_buffer:Buffer<f64> = Buffer::builder()
+													.queue(self.pro_que[0].queue().clone())
+													.flags(MemFlags::new().use_host_ptr().read_only())
+													.len(self.units[1].0)
+													.host_data(&wi)
+													.build().unwrap();
 
-			unsafe { kernel.enq().unwrap() }
+				let kernel = self.kernels[0]
+								.clone()
+								.set_arg_scl_named("units", self.units[1].0 as usize)
+								.unwrap()
+								.set_arg_scl_named("o",*o)
+								.unwrap()
+								.set_arg_buf_named("w",Some(&w_buffer))
+								.unwrap()
+								.set_arg_buf_named("u",Some(&u_buffer))
+								.unwrap()
+								.clone();
 
-			unsafe {
-				let p = ur_buffer.map()
-										.len(self.units[1].0)
-										.read().enq().unwrap().as_ptr();
-
-				for i in 1..ul.len() {
-					ul[i] = *p.offset(i as isize - 1 as isize);
-				}
+				unsafe { kernel.enq().unwrap() }
 			}
+
+			u_buffer.read(&mut ul[1..]).enq().unwrap();
 		}
 
 		u.push(ul);
@@ -462,76 +394,36 @@ impl NNModel {
 
 			o[ll][0] = 1f64;
 			{
-				let mut w:Vec<f64> = Vec::with_capacity((self.units[l].0+1) * self.units[ll].0);
-
-				for wi in &self.layers[l] {
-					w.extend_from_slice(wi);
-				}
-				let o_buffer:Buffer<f64> = Buffer::builder()
-													.queue(self.pro_que[l].queue().clone())
-													.flags(MemFlags::new().read_only().use_host_ptr())
-													.len(self.units[l].0+1)
-													.host_data(&o[l])
-													.build().unwrap();
-
-				let w_buffer:Buffer<f64> = Buffer::builder()
-													.queue(self.pro_que[l].queue().clone())
-													.flags(MemFlags::new().read_only().use_host_ptr())
-													.len((self.units[l].0+1) * self.units[ll].0)
-													.host_data(&w)
-													.build().unwrap();
-
-
 				let u_buffer:Buffer<f64> = Buffer::builder()
-													.queue(self.pro_que[l].queue().clone())
-													.flags(MemFlags::new().read_write().alloc_host_ptr())
-													.len((self.units[0].0+1) * self.units[ll].0)
-													.build().unwrap();
-				let kernel = self.kernels[l].0
-								.clone()
-								.set_arg_scl_named("units", self.units[l].0 + 1 as usize)
-								.unwrap()
-								.set_arg_scl_named("width",self.units[ll].0 as usize)
-								.unwrap()
-								.set_arg_buf_named("o",Some(&o_buffer))
-								.unwrap()
-								.set_arg_buf_named("w",Some(&w_buffer))
-								.unwrap()
-								.set_arg_buf_named("u",Some(&u_buffer))
-								.unwrap()
-								.clone();
-
-				unsafe { kernel.enq().unwrap() }
-
-				let ur_buffer:Buffer<f64> = Buffer::builder()
 													.queue(self.pro_que[l].queue().clone())
 													.flags(MemFlags::new().read_write().alloc_host_ptr())
 													.len(self.units[ll].0)
 													.build().unwrap();
+				for (o,wi) in o[l].iter().zip(&self.layers[l]) {
+					let w_buffer:Buffer<f64> = Buffer::builder()
+														.queue(self.pro_que[l].queue().clone())
+														.flags(MemFlags::new().read_only().use_host_ptr())
+														.len(self.units[ll].0)
+														.host_data(&wi)
+														.build().unwrap();
 
-				let kernel = self.kernels[l].1
-								.clone()
-								.set_arg_scl_named("units", self.units[l].0 + 1 as usize)
-								.unwrap()
-								.set_arg_scl_named("width",self.units[ll].0 as usize)
-								.unwrap()
-								.set_arg_buf_named("u",Some(&u_buffer))
-								.unwrap()
-								.set_arg_buf_named("ur",Some(&ur_buffer))
-								.unwrap()
-								.clone();
 
-				unsafe { ur_buffer.map().read().enq().unwrap(); }
+					let kernel = self.kernels[l]
+									.clone()
+									.set_arg_scl_named("units", self.units[ll].0 as usize)
+									.unwrap()
+									.set_arg_scl_named("o",*o)
+									.unwrap()
+									.set_arg_buf_named("w",Some(&w_buffer))
+									.unwrap()
+									.set_arg_buf_named("u",Some(&u_buffer))
+									.unwrap()
+									.clone();
 
-				unsafe {
-					let p = ur_buffer.map()
-										.len(self.units[ll].0)
-										.read().enq().unwrap().as_ptr();
-
-					for i in 1..ul.len() {
-						ul[i] = *p.offset(i as isize - 1 as isize);
-					}
+					unsafe { kernel.enq().unwrap() }
 				}
+
+				u_buffer.read(&mut ul[1..]).enq().unwrap();
 			}
 
 			u.push(ul);
