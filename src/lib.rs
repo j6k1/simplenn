@@ -1,3 +1,11 @@
+#![feature(proc_macro)]
+
+extern crate accel;
+extern crate accel_derive;
+
+use accel_derive::kernel;
+use accel::*;
+
 extern crate rand;
 
 pub mod function;
@@ -13,6 +21,15 @@ use function::activation::*;
 use function::loss::*;
 use function::optimizer::*;
 
+#[kernel]
+#[depends("accel-core"="0.2.0-alpha")]
+#[build_path_home(".rust2ptx")]
+pub unsafe fn vec_mul(units: usize, o: f64, w: *const f64, u: *mut f64) {
+	let i = accel_core::index();
+	if (i as usize) < units {
+		*u.offset(i) = *u.offset(i) + o * *w.offset(i);
+	}
+}
 pub struct NN<O,E> where O: Optimizer, E: LossFunction {
 	model:NNModel,
 	optimizer:O,
@@ -269,17 +286,26 @@ impl NNModel {
 
 		o.push(oi);
 
-		u.push(Vec::with_capacity(self.units[1].0 + 1));
 
-		u[1].resize(self.units[1].0 + 1, 0f64);
+		let grid = Grid::x(((self.units[1].0 - 1) / 512 + 1) as u32);
+		let block = Block::x(512);
+		let mut ul = UVec::new(u[1].len()-1).unwrap();
 
 		for (o,wl) in o[0].iter().zip(&self.layers[0]) {
-			for (u,w) in u[1].iter_mut().skip(1).zip(wl) {
-				*u += o * w;
+			let mut w = UVec::new(wl.len()).unwrap();
+
+			for i in 0..wl.len() {
+				w[i] = wl[i];
 			}
+			vec_mul(grid,block,self.units[1].0,*o,w.as_ptr(),ul.as_mut_ptr());
+			device::sync().unwrap();
 		}
 
-		o.	push(Vec::with_capacity(self.units[1].0 + 1));
+
+		u.push(Vec::new());
+		u[1].extend_from_slice(ul.as_slice());
+
+		o.push(Vec::with_capacity(self.units[1].0 + 1));
 		o[1].resize(self.units[1].0 + 1, 0f64);
 
 		let f:&Box<ActivateF> = match self.units[1].1 {
@@ -299,9 +325,6 @@ impl NNModel {
 
 		for l in 1..self.units.len() - 1 {
 			let ll = l + 1;
-			let mut ul:Vec<f64> = Vec::with_capacity(self.units[ll].0 + 1);
-			ul.resize(self.units[ll].0 + 1, 0f64);
-			u.push(ul);
 			let f:&Box<ActivateF> = match self.units[ll].1 {
 				Some(ref f) => f,
 				None => {
@@ -317,11 +340,21 @@ impl NNModel {
 
 			o[ll][0] = 1f64;
 
+			let grid = Grid::x(((self.units[ll].0 - 1) / 512 + 1) as u32);
+			let block = Block::x(512);
+			let mut ul = UVec::new(u[ll].len()-1).unwrap();
+
 			for (o,wl) in o[l].iter().zip(&self.layers[l]) {
-				for (u,w) in u[ll].iter_mut().skip(1).zip(wl) {
-					*u = *u + o * w;
+				let mut w = UVec::new(wl.len()).unwrap();
+
+				for i in 0..wl.len() {
+					w[i] = wl[i];
 				}
+				vec_mul(grid,block,self.units[ll].0,*o,w.as_ptr(),ul.as_mut_ptr());
+				device::sync().unwrap();
 			}
+
+			u[ll].extend_from_slice(ul.as_slice());
 
 			let u = &u[ll];
 

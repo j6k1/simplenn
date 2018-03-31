@@ -44,7 +44,7 @@ impl Optimizer for SGD {
 	fn update(&mut self,_:(usize,usize),e:&[f64], win:&Vec<f64>,wout:&mut Vec<f64>) {
 		let a = self.a;
 		let lambda = self.lambda;
-		for (w,(wi,ei)) in wout.iter_mut().zip((win.iter().zip(e))) {
+		for (w,(wi,ei)) in wout.iter_mut().zip(win.iter().zip(e)) {
 			*w = wi - a * ei + lambda * wi;
 		}
 	}
