@@ -145,7 +145,8 @@ impl NNModel {
 
 	pub fn with_list_of_bias_and_unit_initializer<I,F,E>(units:NNUnits,
 												reader:I,
-												mut init_list:Vec<(f64,F)>) ->
+												init_list:Vec<f64>,
+												mut initializer:F) ->
 		Result<NNModel,StartupError<E>>
 		where I: InputReader<E>, F: FnMut() -> f64, E: Error + fmt::Debug, StartupError<E>: From<E> {
 
@@ -162,15 +163,13 @@ impl NNModel {
 
 				let mut unit:Vec<f64> = Vec::with_capacity(sunits[i+1]);
 
-				unit.resize(sunits[i+1], init_list[i].0);
+				unit.resize(sunits[i+1], init_list[i]);
 				layer.push(unit);
 
 				for _ in 1..sunits[i] + 1 {
 					let mut unit:Vec<f64> = Vec::with_capacity(sunits[i+1]);
 					for _ in 0..sunits[i+1] {
-						match init_list[i] {
-							(_,ref mut f) => unit.push(f())
-						}
+						unit.push(initializer())
 					}
 					layer.push(unit);
 				}
