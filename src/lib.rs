@@ -96,14 +96,42 @@ impl NNModel {
 		reader.read_model()
 	}
 
-	fn new(units:Vec<(usize,Option<Box<ActivateF>>)>,layers:Vec<Vec<Vec<f64>>>) -> NNModel {
+	pub fn new<E>(units:Vec<(usize,Option<Box<ActivateF>>)>,layers:Vec<Vec<Vec<f64>>>) -> Result<NNModel,StartupError<E>>
+		where E: Error + fmt::Debug, StartupError<E>: From<E> {
+
 		let mut rnd = rand::XorShiftRng::new_unseeded();
 
-		NNModel {
+		if layers.len() != units.len() - 1 {
+			return Err(StartupError::InvalidConfiguration(format!("The layers count do not match. (units = {}, layers = {})", units.len(), layers.len())));
+		}
+		else
+		{
+			for i in 0..layers.len() {
+				if units[i].0+1 != layers[i].len()
+				{
+					return Err(StartupError::InvalidConfiguration(format!(
+							"The number of units in Layer {} do not match. (correct size = {}, size = {})",i,units[i].0 + 1,layers[i].len())));
+				}
+
+				for j in 0..units[i].0+1 {
+					match layers[i][j].len() {
+						len if i ==  layers.len() - 1 && len != units[i+1].0 => {
+							return Err(StartupError::InvalidConfiguration(format!(
+								"Weight {} is defined for unit {} in layer {}, but this does not match the number of units in the lower layer.",
+								layers[i][j].len(), i, units[i+1].0
+							)));
+						},
+						_ => (),
+					}
+				}
+			}
+		}
+
+		Ok(NNModel {
 			units:units,
 			layers:layers,
 			hash:rnd.next_u64(),
-		}
+		})
 	}
 
 	pub fn with_bias_and_unit_initializer<I,F,E>(units:NNUnits,
@@ -214,36 +242,11 @@ impl NNModel {
 			},
 			false => initializer(),
 		};
-		if layers.len() != units.len() - 1 {
-			return Err(StartupError::InvalidConfiguration(format!("The layers count do not match. (units = {}, layers = {})", units.len(), layers.len())));
-		}
-		else
-		{
-			for i in 0..layers.len() {
-				if units[i].0+1 != layers[i].len()
-				{
-					return Err(StartupError::InvalidConfiguration(format!(
-							"The number of units in Layer {} do not match. (correct size = {}, size = {})",i,units[i].0 + 1,layers[i].len())));
-				}
 
-				for j in 0..units[i].0+1 {
-					match layers[i][j].len() {
-						len if i ==  layers.len() - 1 && len != units[i+1].0 => {
-							return Err(StartupError::InvalidConfiguration(format!(
-								"Weight {} is defined for unit {} in layer {}, but this does not match the number of units in the lower layer.",
-								layers[i][j].len(), i, units[i+1].0
-							)));
-						},
-						_ => (),
-					}
-				}
-			}
-		}
-
-		Ok(NNModel::new(
+		NNModel::new(
 			units,
 			layers,
-		))
+		)
 	}
 
 	pub fn apply<F,R>(&self,input:&Vec<f64>,after_callback:F) -> Result<R,InvalidStateError>
