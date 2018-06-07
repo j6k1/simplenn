@@ -178,6 +178,11 @@ impl NNModel {
 		Result<NNModel,StartupError<E>>
 		where I: InputReader<E>, F: FnMut() -> f64, E: Error + fmt::Debug, StartupError<E>: From<E> {
 
+		if init_list.len() != units.defs.len() {
+			return Err(StartupError::InvalidConfiguration(
+					format!("The number of entries in bias definition is invalid.")));
+		}
+
 		let iunits = units.input_units;
 		let mut sunits = units.defs.iter().map(|u| u.0).collect::<Vec<usize>>();
 		sunits.insert(0, iunits);
