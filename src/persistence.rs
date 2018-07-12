@@ -1,10 +1,12 @@
 use std::io::BufReader;
 use std::io::BufRead;
+use std::io::Read;
 use std::io::BufWriter;
 use std::io::Write;
 use std::path::Path;
 use std::fs::File;
 use std::fs::OpenOptions;
+use std::f64;
 use InputReader;
 
 use std::fmt;
@@ -157,3 +159,103 @@ impl Persistence<PersistenceWriteError> for PersistenceWithTextFile where Persis
 		Ok(())
 	}
 }
+pub struct BinFileInputReader {
+	reader:Option<BufReader<File>>,
+}
+impl BinFileInputReader {
+	pub fn new (file:&str) -> Result<BinFileInputReader, ConfigReadError>
+		where ConfigReadError: Error + fmt::Debug, StartupError<ConfigReadError>: From<ConfigReadError> {
+		Ok(match Path::new(file).exists() {
+			true => {
+				BinFileInputReader {
+					reader:Some(BufReader::new(OpenOptions::new().read(true).create(false).open(file)?)),
+				}
+			},
+			false => BinFileInputReader{
+				reader:None,
+			}
+		})
+	}
+
+	fn next_double(&mut self) -> Result<f64, ConfigReadError> {
+		let mut buf = [0; 8];
+
+		return match self.reader {
+			Some(ref mut reader) => {
+				reader.read_exact(&mut buf)?;
+
+				Ok(f64::from_bits(
+						(buf[0] as u64) << 56 |
+						(buf[1] as u64) << 48 |
+						(buf[2] as u64) << 40 |
+						(buf[3] as u64) << 32 |
+						(buf[4] as u64) << 24 |
+						(buf[5] as u64) << 16 |
+						(buf[6] as u64) << 8  |
+						 buf[7] as u64))
+			},
+			None => Err(ConfigReadError::InavalidState(String::from(
+													"The file does not exist yet."))),
+		}
+	}
+}
+impl InputReader<ConfigReadError> for BinFileInputReader where ConfigReadError: Error + fmt::Debug {
+	fn read_vec(&mut self, units:usize, w:usize) -> Result<Vec<Vec<f64>>, ConfigReadError> {
+		let mut v:Vec<Vec<f64>> = Vec::with_capacity(units);
+
+		for _ in 0..units {
+			let mut u = Vec::with_capacity(w);
+			for _ in 0..w {
+				u.push(self.next_double()?);
+			}
+			v.push(u);
+		}
+		Ok(v)
+	}
+
+	fn source_exists(&mut self) -> bool {
+		match self.reader {
+			Some(_) => true,
+			None => false,
+		}
+	}
+}
+pub struct PersistenceWithBinFile {
+	writer:BufWriter<File>,
+}
+impl PersistenceWithBinFile
+	where PersistenceWriteError: Error + fmt::Debug,
+			PersistenceError<PersistenceWriteError>: From<PersistenceWriteError> {
+	pub fn new(file:&str) -> Result<PersistenceWithBinFile,io::Error> {
+		Ok(PersistenceWithBinFile {
+			writer:BufWriter::new(OpenOptions::new().write(true).create(true).open(file)?),
+		})
+	}
+}
+impl Persistence<PersistenceWriteError> for PersistenceWithBinFile where PersistenceWriteError: Error + fmt::Debug {
+	fn save(&mut self,layers:&Vec<Vec<Vec<f64>>>) -> Result<(),PersistenceWriteError> {
+		for units in layers {
+			for unit in units {
+				for w in unit {
+					let mut buf = [0; 8];
+					let bits = w.to_bits();
+
+					buf[0] = (bits >> 56 & 0xff) as u8;
+					buf[1] = (bits >> 48 & 0xff) as u8;
+					buf[2] = (bits >> 40 & 0xff) as u8;
+					buf[3] = (bits >> 32 & 0xff) as u8;
+					buf[4] = (bits >> 24 & 0xff) as u8;
+					buf[5] = (bits >> 16 & 0xff) as u8;
+					buf[6] = (bits >> 8 & 0xff) as u8;
+					buf[7] = (bits & 0xff) as u8;
+
+					self.writer.write(&buf)?;
+				}
+			}
+		}
+
+		Ok(())
+	}
+}
+
+
