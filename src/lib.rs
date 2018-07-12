@@ -146,9 +146,10 @@ impl NNModel {
 				__global double *w,
 				__global double *u) {
 				size_t index = get_global_id(0);
+				size_t _weights = weights;
 				double _u = 0;
 
-				for (size_t i = 0, l = weights, wi = index * l; i < l; i++, wi++) {
+				for (size_t i = 0, l = units, wi = index; i < l; i++, wi+=_weights) {
 					_u = _u + o[i] * w[wi];
 				}
 
