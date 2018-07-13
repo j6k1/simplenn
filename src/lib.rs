@@ -40,7 +40,7 @@ impl<O,E> NN<O,E> where O: Optimizer, E: LossFunction {
 		self.model.apply(input,|r,o,u| Ok(SnapShot::new(r,o,u,self.model.hash)))
 	}
 
-	pub fn solve(&mut self,input:&Vec<f64>) ->
+	pub fn solve(&self,input:&Vec<f64>) ->
 		Result<Vec<f64>,InvalidStateError> {
 
 		self.model.solve(input)
@@ -58,7 +58,7 @@ impl<O,E> NN<O,E> where O: Optimizer, E: LossFunction {
 		Ok(self.model.latter_part_of_learning(t,s,&mut self.optimizer,&self.lossf)?)
 	}
 
-	pub fn save<P,ERR>(&mut self,mut persistence:P) -> Result<(),PersistenceError<ERR>>
+	pub fn save<P,ERR>(&self,mut persistence:P) -> Result<(),PersistenceError<ERR>>
 		where P: Persistence<ERR>, ERR: Error + fmt::Debug, PersistenceError<ERR>: From<ERR> {
 		persistence.save(&self.model.layers)?;
 
@@ -450,7 +450,7 @@ impl NNModel {
 		Ok(())
 	}
 
-	fn solve(&mut self,input:&Vec<f64>) ->
+	fn solve(&self,input:&Vec<f64>) ->
 		Result<Vec<f64>,InvalidStateError> {
 
 		self.apply(input,|r,_,_| Ok(r))
