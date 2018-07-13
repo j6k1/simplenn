@@ -15,7 +15,6 @@ use ocl::Buffer;
 use ocl::MemFlags;
 use ocl::ProQue;
 use ocl::SpatialDims;
-use ocl::Kernel;
 
 use function::activation::*;
 use function::loss::*;
@@ -48,7 +47,7 @@ impl<O,E> NN<O,E> where O: Optimizer, E: LossFunction {
 		self.model.apply(input,|r,o,u| Ok(SnapShot::new(r,o,u,self.model.hash)))
 	}
 
-	pub fn solve(&mut self,input:&Vec<f64>) ->
+	pub fn solve(&self,input:&Vec<f64>) ->
 		Result<Vec<f64>,InvalidStateError> {
 
 		self.model.solve(input)
@@ -66,7 +65,7 @@ impl<O,E> NN<O,E> where O: Optimizer, E: LossFunction {
 		Ok(self.model.latter_part_of_learning(t,s,&mut self.optimizer,&self.lossf)?)
 	}
 
-	pub fn save<P,ERR>(&mut self,mut persistence:P) -> Result<(),PersistenceError<ERR>>
+	pub fn save<P,ERR>(&self,mut persistence:P) -> Result<(),PersistenceError<ERR>>
 		where P: Persistence<ERR>, ERR: Error + fmt::Debug, PersistenceError<ERR>: From<ERR> {
 		persistence.save(&self.model.layers)?;
 
@@ -98,7 +97,6 @@ pub struct NNModel {
 	layers:Vec<Vec<Vec<f64>>>,
 	hash:u64,
 	pro_que:Vec<ProQue>,
-	kernels:Vec<Kernel>,
 }
 impl NNModel {
 	pub fn load<I,E>(mut reader:I) -> Result<NNModel, E>
@@ -158,7 +156,6 @@ impl NNModel {
 		"#;
 
 		let mut pro_que:Vec<ProQue> = Vec::new();
-		let mut kernels:Vec<Kernel> = Vec::new();
 
 		for i in 1..units.len() {
 			let global_work_size = SpatialDims::new(
@@ -169,14 +166,6 @@ impl NNModel {
 							.dims(global_work_size)
 							.build().expect("Build ProQue");
 			pro_que.push(pq.clone());
-
-			kernels.push(pq.create_kernel("vec_mul")
-									.unwrap()
-									.arg_scl_named::<usize>("units",None)
-									.arg_scl_named::<usize>("weights",None)
-									.arg_buf_named::<f64,Buffer<f64>>("o",None)
-									.arg_buf_named::<f64,Buffer<f64>>("w",None)
-									.arg_buf_named::<f64,Buffer<f64>>("u",None));
 		}
 
 		Ok(NNModel {
@@ -184,7 +173,6 @@ impl NNModel {
 			layers:layers,
 			hash:rnd.next_u64(),
 			pro_que:pro_que,
-			kernels:kernels,
 		})
 	}
 
@@ -355,8 +343,13 @@ impl NNModel {
 												.len(self.units[1].0)
 												.build().unwrap();
 
-			let kernel = self.kernels[0]
-							.clone()
+			let kernel = self.pro_que[0].clone().create_kernel("vec_mul")
+							.unwrap()
+							.arg_scl_named::<usize>("units",None)
+							.arg_scl_named::<usize>("weights",None)
+							.arg_buf_named::<f64,Buffer<f64>>("o",None)
+							.arg_buf_named::<f64,Buffer<f64>>("w",None)
+							.arg_buf_named::<f64,Buffer<f64>>("u",None)
 							.set_arg_scl_named("units", self.units[0].0 as usize + 1)
 							.unwrap()
 							.set_arg_scl_named("weights", self.units[1].0 as usize)
@@ -439,8 +432,13 @@ impl NNModel {
 													.flags(MemFlags::new().read_write().alloc_host_ptr())
 													.len(self.units[ll].0)
 													.build().unwrap();
-				let kernel = self.kernels[l]
-								.clone()
+				let kernel = self.pro_que[l].clone().create_kernel("vec_mul")
+								.unwrap()
+								.arg_scl_named::<usize>("units",None)
+								.arg_scl_named::<usize>("weights",None)
+								.arg_buf_named::<f64,Buffer<f64>>("o",None)
+								.arg_buf_named::<f64,Buffer<f64>>("w",None)
+								.arg_buf_named::<f64,Buffer<f64>>("u",None)
 								.set_arg_scl_named("units", self.units[l].0 as usize + 1)
 								.unwrap()
 								.set_arg_scl_named("weights", self.units[ll].0 as usize)
@@ -577,7 +575,7 @@ impl NNModel {
 		Ok(())
 	}
 
-	fn solve(&mut self,input:&Vec<f64>) ->
+	fn solve(&self,input:&Vec<f64>) ->
 		Result<Vec<f64>,InvalidStateError> {
 
 		self.apply(input,|r,_,_| Ok(r))
