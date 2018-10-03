@@ -344,22 +344,11 @@ impl NNModel {
 
 			let kernel = self.pro_que[0].clone().create_kernel("vec_mul")
 							.unwrap()
-							.arg_scl_named::<usize>("units",None)
-							.arg_scl_named::<usize>("weights",None)
-							.arg_buf_named::<f64,Buffer<f64>>("o",None)
-							.arg_buf_named::<f64,Buffer<f64>>("w",None)
-							.arg_buf_named::<f64,Buffer<f64>>("u",None)
-							.set_arg_scl_named("units", self.units[0].0 as usize + 1)
-							.unwrap()
-							.set_arg_scl_named("weights", self.units[1].0 as usize)
-							.unwrap()
-							.set_arg_buf_named("o",Some(&o_buffer))
-							.unwrap()
-							.set_arg_buf_named("w",Some(&w_buffer))
-							.unwrap()
-							.set_arg_buf_named("u",Some(&u_buffer))
-							.unwrap()
-							.clone();
+							.arg_scl(self.units[0].0 as usize + 1)
+							.arg_scl(self.units[1].0 as usize)
+							.arg_buf(&o_buffer)
+							.arg_buf(&w_buffer)
+							.arg_buf(&u_buffer);
 
 			unsafe { kernel.enq().unwrap() }
 
@@ -431,22 +420,11 @@ impl NNModel {
 													.build().unwrap();
 				let kernel = self.pro_que[l].clone().create_kernel("vec_mul")
 								.unwrap()
-								.arg_scl_named::<usize>("units",None)
-								.arg_scl_named::<usize>("weights",None)
-								.arg_buf_named::<f64,Buffer<f64>>("o",None)
-								.arg_buf_named::<f64,Buffer<f64>>("w",None)
-								.arg_buf_named::<f64,Buffer<f64>>("u",None)
-								.set_arg_scl_named("units", self.units[l].0 as usize + 1)
-								.unwrap()
-								.set_arg_scl_named("weights", self.units[ll].0 as usize)
-								.unwrap()
-								.set_arg_buf_named("o", Some(&o_buffer))
-								.unwrap()
-								.set_arg_buf_named("w",Some(&w_buffer))
-								.unwrap()
-								.set_arg_buf_named("u",Some(&u_buffer))
-								.unwrap()
-								.clone();
+								.arg_scl(self.units[l].0 as usize + 1)
+								.arg_scl(self.units[ll].0 as usize)
+								.arg_buf(&o_buffer)
+								.arg_buf(&w_buffer)
+								.arg_buf(&u_buffer);
 
 				unsafe { kernel.enq().unwrap() }
 
