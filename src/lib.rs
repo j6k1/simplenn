@@ -159,7 +159,7 @@ impl NNModel {
 
 		for i in 1..units.len() {
 			let global_work_size = SpatialDims::new(
-									Some(units[i-1].0+1),
+									Some(units[i].0),
 									Some(1),Some(1)).unwrap();
 			let pq = ProQue::builder()
 							.src(src)
@@ -319,11 +319,10 @@ impl NNModel {
 
 		{
 			let wi = self.layers[0]
-						.iter()
-						.fold(Vec::with_capacity(self.units[0].0+1*self.units[1].0), |mut acc,units| {
-							acc.append(&mut units.clone());
-							acc
-						});
+						.clone()
+						.into_iter()
+						.flatten()
+						.collect::<Vec<f64>>();
 			let o_buffer:Buffer<f64> = Buffer::builder()
 												.queue(self.pro_que[0].queue().clone())
 												.flags(MemFlags::new().use_host_ptr().read_only())
@@ -408,12 +407,10 @@ impl NNModel {
 			o[ll][0] = 1f64;
 			{
 				let wi = self.layers[l]
-									.iter()
-									.fold(Vec::with_capacity((self.units[l].0 + 1) * self.units[ll].0),
-										|mut acc,units| {
-										acc.append(&mut units.clone());
-										acc
-									});
+									.clone()
+									.into_iter()
+									.flatten()
+									.collect::<Vec<f64>>();
 				let o_buffer:Buffer<f64> = Buffer::builder()
 													.queue(self.pro_que[l].queue().clone())
 													.flags(MemFlags::new().use_host_ptr().read_only())
