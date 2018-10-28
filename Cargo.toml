@@ -6,7 +6,6 @@ authors = ["jinpu"]
 [dependencies]
 rand = "0.4"
 [dependencies.accel]
-git = "https://github.com/termoshtt/accel.git"
+path = "F:\\source\\Rust\\accel"
 [dependencies.accel-derive]
-version = "0.1.0"
-git = "https://github.com/termoshtt/accel.git"
+path = "F:\\source\\Rust\\accel\\accel-derive"
