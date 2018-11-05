@@ -281,8 +281,10 @@ impl NNModel {
 		u[1].resize(self.units[1].0 + 1, 0f64);
 
 		for (o,wl) in o[0].iter().zip(&self.layers[0]) {
-			for (u,w) in u[1].iter_mut().skip(1).zip(wl) {
-				*u += o * w;
+			for u in u[1].iter_mut().skip(1) {
+				for w in wl.iter() {
+					*u += o * w;
+				}
 			}
 		}
 
@@ -325,8 +327,10 @@ impl NNModel {
 			o[ll][0] = 1f64;
 
 			for (o,wl) in o[l].iter().zip(&self.layers[l]) {
-				for (u,w) in u[ll].iter_mut().skip(1).zip(wl) {
-					*u = *u + o * w;
+				for u in u[ll].iter_mut().skip(1) {
+					for w in wl.iter() {
+						*u = *u + o * w;
+					}
 				}
 			}
 
