@@ -150,7 +150,7 @@ impl NNModel {
 				for (size_t i = 0, l = units, wi = index; i < l; i++, wi+=_weights) {
 					_u = _u + o[i] * w[wi];
 				}
-
+				--index;
 				u[index] = _u;
 			}
 		"#;
@@ -332,7 +332,7 @@ impl NNModel {
 			let w_buffer:Buffer<f64> = Buffer::builder()
 												.queue(self.pro_que[0].queue().clone())
 												.flags(MemFlags::new().use_host_ptr().read_only())
-												.len((self.units[0].0 + 1) * self.units[1].0)
+												.len((self.units[0].0+1) * self.units[1].0)
 												.host_data(&wi)
 												.build().unwrap();
 
@@ -344,8 +344,8 @@ impl NNModel {
 
 			let kernel = self.pro_que[0].clone().create_kernel("vec_mul")
 							.unwrap()
-							.arg_scl(self.units[0].0 as usize + 1)
-							.arg_scl(self.units[1].0 as usize)
+							.arg_scl(self.units[0].0 as u64 + 1)
+							.arg_scl(self.units[1].0 as u64)
 							.arg_buf(&o_buffer)
 							.arg_buf(&w_buffer)
 							.arg_buf(&u_buffer);
@@ -409,7 +409,7 @@ impl NNModel {
 				let w_buffer:Buffer<f64> = Buffer::builder()
 													.queue(self.pro_que[l].queue().clone())
 													.flags(MemFlags::new().read_only().use_host_ptr())
-													.len((self.units[l].0 + 1) * self.units[ll].0)
+													.len((self.units[l].0+1) * self.units[ll].0)
 													.host_data(&wi)
 													.build().unwrap();
 
@@ -420,8 +420,8 @@ impl NNModel {
 													.build().unwrap();
 				let kernel = self.pro_que[l].clone().create_kernel("vec_mul")
 								.unwrap()
-								.arg_scl(self.units[l].0 as usize + 1)
-								.arg_scl(self.units[ll].0 as usize)
+								.arg_scl(self.units[l].0 as u64 + 1)
+								.arg_scl(self.units[ll].0 as u64)
 								.arg_buf(&o_buffer)
 								.arg_buf(&w_buffer)
 								.arg_buf(&u_buffer);
