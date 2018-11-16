@@ -115,7 +115,7 @@ impl NNModel {
 
 				for j in 0..units[i].0+1 {
 					match layers[i][j].len() {
-						len if i ==  layers.len() - 1 && len != units[i+1].0 => {
+						len if len != units[i+1].0 => {
 							return Err(StartupError::InvalidConfiguration(format!(
 								"Weight {} is defined for unit {} in layer {}, but this does not match the number of units in the lower layer.",
 								layers[i][j].len(), i, units[i+1].0
@@ -134,8 +134,8 @@ impl NNModel {
 		})
 	}
 
-	pub fn with_bias_and_unit_initializer<I,F,E>(units:NNUnits,
-												reader:I,bias:f64,
+	pub fn with_unit_initializer<I,F,E>(units:NNUnits,
+												reader:I,
 												mut initializer:F) ->
 		Result<NNModel,StartupError<E>>
 		where I: InputReader<E>, F: FnMut() -> f64, E: Error + fmt::Debug, StartupError<E>: From<E> {
@@ -149,14 +149,9 @@ impl NNModel {
 			let mut layers:Vec<Vec<Vec<f64>>> = Vec::with_capacity(sunits.len());
 
 			for i in 0..sunits.len() - 1 {
-				let mut layer:Vec<Vec<f64>> = Vec::with_capacity(sunits[i]);
+				let mut layer:Vec<Vec<f64>> = Vec::with_capacity(sunits[i]+1);
 
-				let mut unit:Vec<f64> = Vec::with_capacity(sunits[i+1]);
-
-				unit.resize(sunits[i+1], bias);
-				layer.push(unit);
-
-				for _ in 1..sunits[i] + 1 {
+				for _ in 0..sunits[i] + 1 {
 					let mut unit:Vec<f64> = Vec::with_capacity(sunits[i+1]);
 					for _ in 0..sunits[i+1] {
 						unit.push(initializer());
@@ -171,17 +166,13 @@ impl NNModel {
 		})
 	}
 
-	pub fn with_list_of_bias_and_unit_initializer<I,F,E>(units:NNUnits,
+	pub fn with_bias_and_unit_initializer<I,F,B,E>(units:NNUnits,
 												reader:I,
-												init_list:Vec<f64>,
+												mut bias_initializer:B,
 												mut initializer:F) ->
 		Result<NNModel,StartupError<E>>
-		where I: InputReader<E>, F: FnMut() -> f64, E: Error + fmt::Debug, StartupError<E>: From<E> {
-
-		if init_list.len() != units.defs.len() {
-			return Err(StartupError::InvalidConfiguration(
-					format!("The number of entries in bias definition is invalid.")));
-		}
+		where I: InputReader<E>, F: FnMut() -> f64,
+				B: FnMut() -> f64, E: Error + fmt::Debug, StartupError<E>: From<E> {
 
 		let iunits = units.input_units;
 		let mut sunits = units.defs.iter().map(|u| u.0).collect::<Vec<usize>>();
@@ -192,17 +183,20 @@ impl NNModel {
 			let mut layers:Vec<Vec<Vec<f64>>> = Vec::with_capacity(sunits.len());
 
 			for i in 0..sunits.len() - 1 {
-				let mut layer:Vec<Vec<f64>> = Vec::with_capacity(sunits[i]);
+				let mut layer:Vec<Vec<f64>> = Vec::with_capacity(sunits[i]+1);
 
 				let mut unit:Vec<f64> = Vec::with_capacity(sunits[i+1]);
 
-				unit.resize(sunits[i+1], init_list[i]);
+				for _ in 0..sunits[i+1] {
+					unit.push(bias_initializer());
+				}
+
 				layer.push(unit);
 
 				for _ in 1..sunits[i] + 1 {
 					let mut unit:Vec<f64> = Vec::with_capacity(sunits[i+1]);
 					for _ in 0..sunits[i+1] {
-						unit.push(initializer())
+						unit.push(initializer());
 					}
 					layer.push(unit);
 				}
