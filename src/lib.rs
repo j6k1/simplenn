@@ -351,7 +351,7 @@ impl NNModel {
 
 		let mut layers:Vec<Vec<Vec<f64>>> = Vec::with_capacity(self.units.len()-1);
 		let mut d:Vec<f64> = Vec::with_capacity(self.units[self.units.len()-1].0 + 1);
-		d.resize(self.units.len()-1, 0f64);
+		d.resize(self.units[self.units.len()-1].0 + 1, 0f64);
 
 		for l in 0..self.units.len() - 1 {
 			let mut layer:Vec<Vec<f64>> = Vec::with_capacity(self.units[l].0 + 1);
