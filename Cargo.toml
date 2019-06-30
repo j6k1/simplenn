@@ -4,4 +4,6 @@ version = "0.1.0"
 authors = ["jinpu"]
 
 [dependencies]
-rand = "0.4"
+rand = "0.5"
+rand_xorshift = "0.1.1"
+statrs = "0.10.0"

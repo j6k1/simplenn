@@ -1,4 +1,5 @@
 extern crate rand;
+extern crate rand_xorshift;
 
 pub mod function;
 pub mod error;
@@ -8,6 +9,8 @@ use std::fmt;
 use error::*;
 use std::error::Error;
 use rand::Rng;
+use rand::SeedableRng;
+use rand_xorshift::XorShiftRng;
 
 use function::activation::*;
 use function::loss::*;
@@ -99,7 +102,8 @@ impl NNModel {
 	pub fn new<E>(units:Vec<(usize,Option<Box<ActivateF>>)>,layers:Vec<Vec<Vec<f64>>>) -> Result<NNModel,StartupError<E>>
 		where E: Error + fmt::Debug, StartupError<E>: From<E> {
 
-		let mut rnd = rand::XorShiftRng::new_unseeded();
+		let mut rnd = rand::thread_rng();
+		let mut rnd = XorShiftRng::from_seed(rnd.gen());
 
 		if layers.len() != units.len() - 1 {
 			return Err(StartupError::InvalidConfiguration(format!("The layers count do not match. (units = {}, layers = {})", units.len(), layers.len())));
@@ -130,7 +134,7 @@ impl NNModel {
 		Ok(NNModel {
 			units:units,
 			layers:layers,
-			hash:rnd.next_u64(),
+			hash:rnd.gen(),
 		})
 	}
 
@@ -461,8 +465,9 @@ impl NNModel {
 	fn promise_of_learn(&mut self,input:&Vec<f64>) ->
 		Result<SnapShot,InvalidStateError> {
 
-		let mut rnd = rand::XorShiftRng::new_unseeded();
-		self.hash = rnd.next_u64();
+		let mut rnd = rand::thread_rng();
+		let mut rnd = XorShiftRng::from_seed(rnd.gen());
+		self.hash = rnd.gen();
 
 		self.apply(input,|r,o,u| Ok(SnapShot::new(r,o,u,self.hash)))
 	}
