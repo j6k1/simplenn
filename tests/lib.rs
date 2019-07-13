@@ -16,53 +16,385 @@ use simplenn::function::loss::*;
 use simplenn::function::optimizer::*;
 use simplenn::persistence::*;
 
+fn bits_to_vec(value:u32) -> Vec<f64> {
+	let mut v = Vec::new();
+	v.resize(8, 0f64);
+
+	let mut index = 0;
+
+	let mut value = value;
+
+	while value > 0 {
+		v[index] = (value & 1) as f64;
+		value = value >> 1;
+		index += 1;
+	}
+
+	v
+}
 #[test]
-fn test_solve() {
-	for _ in 0..2 {
-		let mut rnd = rand::thread_rng();
-		let mut rnd = XorShiftRng::from_seed(rnd.gen());
-		let n = Normal::new(0.0, 1.0).unwrap();
+fn test_relu_and_sigmoid() {
+	let mut rnd = rand::thread_rng();
+	let mut rnd = XorShiftRng::from_seed(rnd.gen());
+	let n = Normal::new(0.0, 1.0).unwrap();
 
-		let model = NNModel::with_unit_initializer(
-										NNUnits::new(2, (4,Box::new(FReLU::new())), (4,Box::new(FReLU::new())))
-											.add((1,Box::new(FSigmoid::new()))),
-										TextFileInputReader::new("data/nn.txt").unwrap(),
-										move || {
-											n.sample(&mut rnd)
-										}).unwrap();
-		let mut nn = NN::new(model,|_| SGD::new(0.05),Mse::new());
+	let model = NNModel::with_unit_initializer(
+									NNUnits::new(2, (4,Box::new(FReLU::new())), (4,Box::new(FReLU::new())))
+										.add((1,Box::new(FSigmoid::new()))),
+									TextFileInputReader::new("data/initial_nn.txt").unwrap(),
+									move || {
+										n.sample(&mut rnd)
+									}).unwrap();
+	let mut nn = NN::new(model,|_| SGD::new(0.05),Mse::new());
 
-		let pairs:[([f64; 2],[f64; 1]); 4] = [([0f64,0f64],[0f64]),([0f64,1f64],[1f64]),([1f64,0f64],[1f64]),([1f64,1f64],[0f64])];
-		let mut v:Vec<([f64; 2],[f64; 1])> = Vec::new();
-		v.extend(&pairs);
+	let pairs:[([f64; 2],[f64; 1]); 4] = [([0f64,0f64],[0f64]),([0f64,1f64],[1f64]),([1f64,0f64],[1f64]),([1f64,1f64],[0f64])];
+	let mut v:Vec<([f64; 2],[f64; 1])> = Vec::new();
+	v.extend(&pairs);
 
-		for _ in 0..10000 {
-			for ii in 0..4 {
-				let mut i = Vec::new();
-				i.extend(&pairs[ii].0);
-				let mut t = Vec::new();
-				t.extend(&pairs[ii].1);
-				nn.learn(&i, &t).unwrap();
-			}
-		}
-
-		let validator:[Box<Fn(&Vec<f64>) -> bool>; 4] = [
-			Box::new(|v| v[0] <= 0.1f64),
-			Box::new(|v| v[0] >= 0.9f64),
-			Box::new(|v| v[0] >= 0.9f64),
-			Box::new(|v| v[0] <= 0.1f64),
-		];
-
-		for (p,validator) in pairs.iter().zip(&validator) {
+	for _ in 0..10000 {
+		for ii in 0..4 {
 			let mut i = Vec::new();
-			i.extend(&p.0);
-			let nnanswer = nn.solve(&i).unwrap();
-			if validator(&nnanswer) {
-				assert!(true);
-				return;
-			}
+			i.extend(&pairs[ii].0);
+			let mut t = Vec::new();
+			t.extend(&pairs[ii].1);
+			nn.learn(&i, &t).unwrap();
 		}
 	}
 
-	assert!(false);
+	let validator:[Box<Fn(&Vec<f64>) -> bool>; 4] = [
+		Box::new(|v| v[0] <= 0.1f64),
+		Box::new(|v| v[0] >= 0.9f64),
+		Box::new(|v| v[0] >= 0.9f64),
+		Box::new(|v| v[0] <= 0.1f64),
+	];
+
+	for (p,validator) in pairs.iter().zip(&validator) {
+		let mut i = Vec::new();
+		i.extend(&p.0);
+		let nnanswer = nn.solve(&i).unwrap();
+		assert!(validator(&nnanswer));
+	}
+}
+#[test]
+fn test_relu_and_tanh() {
+	let mut rnd = rand::thread_rng();
+	let mut rnd = XorShiftRng::from_seed(rnd.gen());
+	let n = Normal::new(0.0, 1.0).unwrap();
+
+	let model = NNModel::with_unit_initializer(
+									NNUnits::new(2, (4,Box::new(FReLU::new())), (4,Box::new(FSigmoid::new())))
+										.add((1,Box::new(FTanh::new()))),
+									TextFileInputReader::new("data/initial_nn.txt").unwrap(),
+									move || {
+										n.sample(&mut rnd)
+									}).unwrap();
+	let mut nn = NN::new(model,|_| SGD::new(0.1),Mse::new());
+
+	let pairs:[([f64; 2],[f64; 1]); 4] = [([0f64,0f64],[0f64]),([0f64,1f64],[1f64]),([1f64,0f64],[1f64]),([1f64,1f64],[0f64])];
+	let mut v:Vec<([f64; 2],[f64; 1])> = Vec::new();
+	v.extend(&pairs);
+
+	for _ in 0..10000 {
+		for ii in 0..4 {
+			let mut i = Vec::new();
+			i.extend(&pairs[ii].0);
+			let mut t = Vec::new();
+			t.extend(&pairs[ii].1);
+			nn.learn(&i, &t).unwrap();
+		}
+	}
+
+	let validator:[Box<Fn(&Vec<f64>) -> bool>; 4] = [
+		Box::new(|v| v[0] <= 0.1f64),
+		Box::new(|v| v[0] >= 0.9f64),
+		Box::new(|v| v[0] >= 0.9f64),
+		Box::new(|v| v[0] <= 0.1f64),
+	];
+
+	for (p,validator) in pairs.iter().zip(&validator) {
+		let mut i = Vec::new();
+		i.extend(&p.0);
+		let nnanswer = nn.solve(&i).unwrap();
+		assert!(validator(&nnanswer));
+	}
+}
+#[test]
+fn test_relu_and_identity_and_sigmoid() {
+	let mut rnd = rand::thread_rng();
+	let mut rnd = XorShiftRng::from_seed(rnd.gen());
+	let n = Normal::new(0.0, 1.0).unwrap();
+
+	let model = NNModel::with_unit_initializer(
+									NNUnits::new(2, (4,Box::new(FReLU::new())), (4,Box::new(FIdentity::new())))
+										.add((1,Box::new(FSigmoid::new()))),
+									TextFileInputReader::new("data/initial_nn.txt").unwrap(),
+									move || {
+										n.sample(&mut rnd)
+									}).unwrap();
+	let mut nn = NN::new(model,|_| SGD::new(0.1),Mse::new());
+
+	let pairs:[([f64; 2],[f64; 1]); 4] = [([0f64,0f64],[0f64]),([0f64,1f64],[1f64]),([1f64,0f64],[1f64]),([1f64,1f64],[0f64])];
+	let mut v:Vec<([f64; 2],[f64; 1])> = Vec::new();
+	v.extend(&pairs);
+
+	for _ in 0..10000 {
+		for ii in 0..4 {
+			let mut i = Vec::new();
+			i.extend(&pairs[ii].0);
+			let mut t = Vec::new();
+			t.extend(&pairs[ii].1);
+			nn.learn(&i, &t).unwrap();
+		}
+	}
+
+	let validator:[Box<Fn(&Vec<f64>) -> bool>; 4] = [
+		Box::new(|v| v[0] <= 0.1f64),
+		Box::new(|v| v[0] >= 0.9f64),
+		Box::new(|v| v[0] >= 0.9f64),
+		Box::new(|v| v[0] <= 0.1f64),
+	];
+
+	for (p,validator) in pairs.iter().zip(&validator) {
+		let mut i = Vec::new();
+		i.extend(&p.0);
+		let nnanswer = nn.solve(&i).unwrap();
+		assert!(validator(&nnanswer));
+	}
+}
+#[test]
+fn test_fizzbuzz() {
+	let mut rnd = rand::thread_rng();
+	let mut rnd = XorShiftRng::from_seed(rnd.gen());
+	let n = Normal::new(0.0, 1.0).unwrap();
+
+	let model = NNModel::with_unit_initializer(
+									NNUnits::new(8,(36,Box::new(FReLU::new())), (36,Box::new(FReLU::new())))
+										.add((4,Box::new(FSoftMax::new()))),
+									TextFileInputReader::new("data/initial_nn_8_36_36_4.txt").unwrap(),
+									move || {
+										n.sample(&mut rnd)
+									}).unwrap();
+	let mut nn = NN::new(model,|n| Adam::new(n),CrossEntropyMulticlass::new());
+
+	const FIZZBUZZ:[f64; 4] = [1f64,0f64,0f64,0f64];
+	const FIZZ:[f64; 4] = [0f64,1f64,0f64,0f64];
+	const BUZZ:[f64; 4] = [0f64,0f64,1f64,0f64];
+	const OTHER:[f64; 4] = [0f64,0f64,0f64,1f64];
+
+	for _ in 0..50 {
+		for v in 101..256 {
+			let i = bits_to_vec(v);
+
+			let answer = if v % 15 == 0 {
+				&FIZZBUZZ
+			} else if v % 3 == 0 {
+				&FIZZ
+			} else if v % 5 == 0 {
+				&BUZZ
+			} else {
+				&OTHER
+			};
+
+			let mut t = Vec::new();
+
+			t.extend(answer);
+			nn.learn(&i, &t).unwrap();
+		}
+	}
+
+	for v in 101..111 {
+		let mut i = bits_to_vec(v);
+
+		let answer = if v % 15 == 0 {
+			0
+		} else if v % 3 == 0 {
+			1
+		} else if v % 5 == 0 {
+			2
+		} else {
+			3
+		};
+
+		let nnanswer = nn.solve(&i).unwrap();
+
+		assert_eq!(answer,nnanswer.iter().enumerate().fold((0,0f64),|acc,t| {
+			if acc.1 < *t.1 {
+				(t.0,*t.1)
+			} else {
+				acc
+			}
+		}).0);
+	}
+}
+#[test]
+fn test_cross_entropy() {
+	let mut rnd = rand::thread_rng();
+	let mut rnd = XorShiftRng::from_seed(rnd.gen());
+	let n = Normal::new(0.0, 1.0).unwrap();
+
+	let model = NNModel::with_unit_initializer(
+									NNUnits::new(2, (4,Box::new(FReLU::new())), (4,Box::new(FIdentity::new())))
+										.add((1, Box::new(FSigmoid::new()))),
+									TextFileInputReader::new("data/initial_nn.txt").unwrap(),
+									move || {
+										n.sample(&mut rnd)
+									}).unwrap();
+	let mut nn = NN::new(model,|n| Adam::new(n),CrossEntropy::new());
+
+	let pairs:[([f64; 2],[f64; 1]); 4] = [([0f64,0f64],[0f64]),([0f64,1f64],[1f64]),([1f64,0f64],[1f64]),([1f64,1f64],[0f64])];
+	let mut v:Vec<([f64; 2],[f64; 1])> = Vec::new();
+	v.extend(&pairs);
+
+	for _ in 0..10000 {
+		for ii in 0..4 {
+			let mut i = Vec::new();
+			i.extend(&pairs[ii].0);
+			let mut t = Vec::new();
+			t.extend(&pairs[ii].1);
+			nn.learn(&i, &t).unwrap();
+		}
+	}
+
+	let validator:[Box<Fn(&Vec<f64>) -> bool>; 4] = [
+		Box::new(|v| v[0] <= 0.1f64),
+		Box::new(|v| v[0] >= 0.9f64),
+		Box::new(|v| v[0] >= 0.9f64),
+		Box::new(|v| v[0] <= 0.1f64),
+	];
+
+	for (p,validator) in pairs.iter().zip(&validator) {
+		let mut i = Vec::new();
+		i.extend(&p.0);
+		let nnanswer = nn.solve(&i).unwrap();
+		assert!(validator(&nnanswer));
+	}
+}
+#[test]
+fn test_relu_and_adagrad() {
+	let mut rnd = rand::thread_rng();
+	let mut rnd = XorShiftRng::from_seed(rnd.gen());
+	let n = Normal::new(0.0, 1.0).unwrap();
+
+	let model = NNModel::with_unit_initializer(
+									NNUnits::new(2, (4,Box::new(FReLU::new())), (4,Box::new(FReLU::new())))
+										.add((1,Box::new(FSigmoid::new()))),
+									TextFileInputReader::new("data/initial_nn.txt").unwrap(),
+									move || {
+										n.sample(&mut rnd)
+									}).unwrap();
+	let mut nn = NN::new(model,|n| Adagrad::new(n),CrossEntropy::new());
+
+	let pairs:[([f64; 2],[f64; 1]); 4] = [([0f64,0f64],[0f64]),([0f64,1f64],[1f64]),([1f64,0f64],[1f64]),([1f64,1f64],[0f64])];
+	let mut v:Vec<([f64; 2],[f64; 1])> = Vec::new();
+	v.extend(&pairs);
+
+	for _ in 0..100000 {
+		for ii in 0..4 {
+			let mut i = Vec::new();
+			i.extend(&pairs[ii].0);
+			let mut t = Vec::new();
+			t.extend(&pairs[ii].1);
+			nn.learn(&i, &t).unwrap();
+		}
+	}
+
+	let validator:[Box<Fn(&Vec<f64>) -> bool>; 4] = [
+		Box::new(|v| v[0] <= 0.1f64),
+		Box::new(|v| v[0] >= 0.85f64),
+		Box::new(|v| v[0] >= 0.85f64),
+		Box::new(|v| v[0] <= 0.1f64),
+	];
+
+	for (p,validator) in pairs.iter().zip(&validator) {
+		let mut i = Vec::new();
+		i.extend(&p.0);
+		let nnanswer = nn.solve(&i).unwrap();
+		assert!(validator(&nnanswer));
+	}
+}
+#[test]
+fn test_relu_and_rmsprop() {
+	let mut rnd = rand::thread_rng();
+	let mut rnd = XorShiftRng::from_seed(rnd.gen());
+	let n = Normal::new(0.0, 1.0).unwrap();
+
+	let model = NNModel::with_unit_initializer(
+									NNUnits::new(2, (4,Box::new(FReLU::new())), (4,Box::new(FReLU::new())))
+										.add((1,Box::new(FSigmoid::new()))),
+									TextFileInputReader::new("data/initial_nn.txt").unwrap(),
+									move || {
+										n.sample(&mut rnd)
+									}).unwrap();
+	let mut nn = NN::new(model,|n| RMSprop::new(n),CrossEntropy::new());
+
+	let pairs:[([f64; 2],[f64; 1]); 4] = [([0f64,0f64],[0f64]),([0f64,1f64],[1f64]),([1f64,0f64],[1f64]),([1f64,1f64],[0f64])];
+	let mut v:Vec<([f64; 2],[f64; 1])> = Vec::new();
+	v.extend(&pairs);
+
+	for _ in 0..20000 {
+		for ii in 0..4 {
+			let mut i = Vec::new();
+			i.extend(&pairs[ii].0);
+			let mut t = Vec::new();
+			t.extend(&pairs[ii].1);
+			nn.learn(&i, &t).unwrap();
+		}
+	}
+
+	let validator:[Box<Fn(&Vec<f64>) -> bool>; 4] = [
+		Box::new(|v| v[0] <= 0.1f64),
+		Box::new(|v| v[0] >= 0.85f64),
+		Box::new(|v| v[0] >= 0.85f64),
+		Box::new(|v| v[0] <= 0.1f64),
+	];
+
+	for (p,validator) in pairs.iter().zip(&validator) {
+		let mut i = Vec::new();
+		i.extend(&p.0);
+		let nnanswer = nn.solve(&i).unwrap();
+		assert!(validator(&nnanswer));
+	}
+}
+#[test]
+fn test_relu_and_adam() {
+	let mut rnd = rand::thread_rng();
+	let mut rnd = XorShiftRng::from_seed(rnd.gen());
+	let n = Normal::new(0.0, 1.0).unwrap();
+
+	let model = NNModel::with_unit_initializer(
+									NNUnits::new(2, (4,Box::new(FReLU::new())), (4,Box::new(FReLU::new())))
+										.add((1,Box::new(FSigmoid::new()))),
+									TextFileInputReader::new("data/initial_nn.txt").unwrap(),
+									move || {
+										n.sample(&mut rnd)
+									}).unwrap();
+	let mut nn = NN::new(model,|n| Adam::new(n),CrossEntropy::new());
+
+	let pairs:[([f64; 2],[f64; 1]); 4] = [([0f64,0f64],[0f64]),([0f64,1f64],[1f64]),([1f64,0f64],[1f64]),([1f64,1f64],[0f64])];
+	let mut v:Vec<([f64; 2],[f64; 1])> = Vec::new();
+	v.extend(&pairs);
+
+	for _ in 0..10000 {
+		for ii in 0..4 {
+			let mut i = Vec::new();
+			i.extend(&pairs[ii].0);
+			let mut t = Vec::new();
+			t.extend(&pairs[ii].1);
+			nn.learn(&i, &t).unwrap();
+		}
+	}
+
+	let validator:[Box<Fn(&Vec<f64>) -> bool>; 4] = [
+		Box::new(|v| v[0] <= 0.1f64),
+		Box::new(|v| v[0] >= 0.9f64),
+		Box::new(|v| v[0] >= 0.9f64),
+		Box::new(|v| v[0] <= 0.1f64),
+	];
+
+	for (p,validator) in pairs.iter().zip(&validator) {
+		let mut i = Vec::new();
+		i.extend(&p.0);
+		let nnanswer = nn.solve(&i).unwrap();
+		assert!(validator(&nnanswer));
+	}
 }
