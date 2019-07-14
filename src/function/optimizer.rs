@@ -45,7 +45,7 @@ impl Optimizer for SGD {
 		let a = self.a;
 		let lambda = self.lambda;
 		for (w,(wi,ei)) in wout.iter_mut().zip(win.iter().zip(e)) {
-			*w = wi - a * ei + lambda * wi;
+			*w = wi - a * (ei + lambda * wi);
 		}
 	}
 }
