@@ -40,14 +40,14 @@ impl<E> From<E> for StartupError<E> where E: Error + fmt::Debug {
 #[derive(Debug)]
 pub enum ConfigReadError {
 	IOError(io::Error),
-	InavalidState(String),
+	InvalidState(String),
 	ParseFloatError(ParseFloatError)
 }
 impl fmt::Display for ConfigReadError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match *self {
 			ConfigReadError::IOError(_) => write!(f, "Error occurred in file I/O."),
-			ConfigReadError::InavalidState(ref s) => write!(f, "{}",s),
+			ConfigReadError::InvalidState(ref s) => write!(f, "{}",s),
 			ConfigReadError::ParseFloatError(_) => write!(f, "An error occurred when converting a string to a double value."),
 		}
 	}
@@ -56,7 +56,7 @@ impl error::Error for ConfigReadError {
 	fn description(&self) -> &str {
 		match *self {
 			ConfigReadError::IOError(_) => "Error occurred in file I/O.",
-			ConfigReadError::InavalidState(_) => "Configuration is invalid.",
+			ConfigReadError::InvalidState(_) => "Configuration is invalid.",
 			ConfigReadError::ParseFloatError(_) => "An error occurred when converting a string to a double value."
 		}
 	}
@@ -64,7 +64,7 @@ impl error::Error for ConfigReadError {
 	fn cause(&self) -> Option<&error::Error> {
 		match *self {
 			ConfigReadError::IOError(ref e) => Some(e),
-			ConfigReadError::InavalidState(_) => None,
+			ConfigReadError::InvalidState(_) => None,
 			ConfigReadError::ParseFloatError(ref e) => Some(e),
 		}
 	}

@@ -49,13 +49,13 @@ impl TextFileInputReader {
 				buf = buf.trim().to_string();
 
 				if n == 0 {
-					Err(ConfigReadError::InavalidState(String::from(
+					Err(ConfigReadError::InvalidState(String::from(
 						"End of input has been reached.")))
 				} else {
 					Ok(buf)
 				}
 			},
-			None => Err(ConfigReadError::InavalidState(String::from(
+			None => Err(ConfigReadError::InvalidState(String::from(
 													"The file does not exist yet."))),
 		}
 	}
@@ -194,7 +194,7 @@ impl BinFileInputReader {
 						(buf[6] as u64) << 8  |
 						 buf[7] as u64))
 			},
-			None => Err(ConfigReadError::InavalidState(String::from(
+			None => Err(ConfigReadError::InvalidState(String::from(
 													"The file does not exist yet."))),
 		}
 	}

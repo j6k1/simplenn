@@ -15,6 +15,8 @@ use simplenn::function::activation::*;
 use simplenn::function::loss::*;
 use simplenn::function::optimizer::*;
 use simplenn::persistence::*;
+use simplenn::error::StartupError;
+use simplenn::error::ConfigReadError;
 
 fn bits_to_vec(value:u32) -> Vec<f64> {
 	let mut v = Vec::new();
@@ -31,6 +33,115 @@ fn bits_to_vec(value:u32) -> Vec<f64> {
 	}
 
 	v
+}
+#[test]
+fn test_textfile_input_reader_wrong_input_extra_data() {
+	let mut rnd = rand::thread_rng();
+	let mut rnd = XorShiftRng::from_seed(rnd.gen());
+	let n = Normal::new(0.0, 1.0).unwrap();
+
+	let r = NNModel::with_unit_initializer(
+				NNUnits::new(2, (4,Box::new(FReLU::new())), (4,Box::new(FReLU::new())))
+				.add((1,Box::new(FSigmoid::new()))),
+				TextFileInputReader::new("data/longer_nn.txt").unwrap(),
+				move || {
+					n.sample(&mut rnd)
+				});
+	match r {
+		Err(StartupError::Fail(ConfigReadError::InvalidState(s))) => {
+			match &*s {
+				"Data loaded , but the input has not reached the end." => {
+					assert!(true);
+				},
+				_ => {
+					assert!(false);
+				}
+			}
+		},
+		_ => {
+			assert!(false);
+		}
+	}
+}
+#[test]
+fn test_binfile_input_reader_wrong_input_extra_data() {
+	let mut rnd = rand::thread_rng();
+	let mut rnd = XorShiftRng::from_seed(rnd.gen());
+	let n = Normal::new(0.0, 1.0).unwrap();
+
+	let r = NNModel::with_unit_initializer(
+				NNUnits::new(2, (4,Box::new(FReLU::new())), (4,Box::new(FReLU::new())))
+				.add((1,Box::new(FSigmoid::new()))),
+				BinFileInputReader::new("data/longer_nn.bin").unwrap(),
+				move || {
+					n.sample(&mut rnd)
+				});
+	match r {
+		Err(StartupError::Fail(ConfigReadError::InvalidState(s))) => {
+			match &*s {
+				"Data loaded , but the input has not reached the end." => {
+					assert!(true);
+				},
+				_ => {
+					assert!(false);
+				}
+			}
+		},
+		_ => {
+			assert!(false);
+		}
+	}
+}
+#[test]
+fn test_textfile_input_reader_wrong_input_data_too_short() {
+	let mut rnd = rand::thread_rng();
+	let mut rnd = XorShiftRng::from_seed(rnd.gen());
+	let n = Normal::new(0.0, 1.0).unwrap();
+
+	let r = NNModel::with_unit_initializer(
+				NNUnits::new(2, (4,Box::new(FReLU::new())), (4,Box::new(FReLU::new())))
+				.add((2,Box::new(FSigmoid::new()))),
+				TextFileInputReader::new("data/too_short_nn.txt").unwrap(),
+				move || {
+					n.sample(&mut rnd)
+				});
+	match r {
+		Err(StartupError::Fail(ConfigReadError::InvalidState(s))) => {
+			match &*s {
+				"End of input has been reached." => {
+					assert!(true);
+				},
+				_ => {
+					assert!(false);
+				}
+			}
+		},
+		_ => {
+			assert!(false);
+		}
+	}
+}
+#[test]
+fn test_binfile_input_reader_wrong_input_data_too_short() {
+	let mut rnd = rand::thread_rng();
+	let mut rnd = XorShiftRng::from_seed(rnd.gen());
+	let n = Normal::new(0.0, 1.0).unwrap();
+
+	let r = NNModel::with_unit_initializer(
+				NNUnits::new(2, (4,Box::new(FReLU::new())), (4,Box::new(FReLU::new())))
+				.add((2,Box::new(FSigmoid::new()))),
+				BinFileInputReader::new("data/too_short_nn.bin").unwrap(),
+				move || {
+					n.sample(&mut rnd)
+				});
+	match r {
+		Err(StartupError::Fail(ConfigReadError::IOError(_))) => {
+			assert!(true);
+		},
+		_ => {
+			assert!(false);
+		}
+	}
 }
 #[test]
 fn test_relu_and_sigmoid() {
