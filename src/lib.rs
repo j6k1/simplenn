@@ -40,7 +40,7 @@ impl<O,E> NN<O,E> where O: Optimizer, E: LossFunction {
 	pub fn promise_of_learn(&mut self,input:&Vec<f64>) ->
 		Result<SnapShot,InvalidStateError> {
 
-		self.model.apply(input,|r,o,u| Ok(SnapShot::new(r,o,u,self.model.hash)))
+		self.model.promise_of_learn(input)
 	}
 
 	pub fn solve(&self,input:&Vec<f64>) ->
@@ -55,7 +55,7 @@ impl<O,E> NN<O,E> where O: Optimizer, E: LossFunction {
 		Ok(self.model.learn(input,&t,&mut self.optimizer,&self.lossf)?)
 	}
 
-	pub fn latter_part_of_learning(&mut self, t:&Vec<f64>,s:SnapShot) ->
+	pub fn latter_part_of_learning(&mut self, t:&Vec<f64>,s:&SnapShot) ->
 		Result<(),InvalidStateError> {
 
 		Ok(self.model.latter_part_of_learning(t,s,&mut self.optimizer,&self.lossf)?)
@@ -344,7 +344,7 @@ impl NNModel {
 		after_callback(r,o,u)
 	}
 
-	fn latter_part_of_learning<O,E>(&mut self, t:&Vec<f64>,s:SnapShot,optimizer:&mut O,lossf:&E) ->
+	fn latter_part_of_learning<O,E>(&mut self, t:&Vec<f64>,s:&SnapShot,optimizer:&mut O,lossf:&E) ->
 		Result<(),InvalidStateError> where O: Optimizer, E: LossFunction {
 
 		if s.hash != self.hash {
@@ -459,7 +459,7 @@ impl NNModel {
 
 		let s = self.promise_of_learn(input)?;
 
-		self.latter_part_of_learning(t,s,optimizer,lossf)
+		self.latter_part_of_learning(t,&s,optimizer,lossf)
 	}
 
 	fn promise_of_learn(&mut self,input:&Vec<f64>) ->

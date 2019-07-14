@@ -17,6 +17,7 @@ use simplenn::function::optimizer::*;
 use simplenn::persistence::*;
 use simplenn::error::StartupError;
 use simplenn::error::ConfigReadError;
+use simplenn::error::InvalidStateError;
 
 fn bits_to_vec(value:u32) -> Vec<f64> {
 	let mut v = Vec::new();
@@ -35,6 +36,21 @@ fn bits_to_vec(value:u32) -> Vec<f64> {
 	v
 }
 #[test]
+fn test_textfile_input_reader_with_contain_whitespace_data() {
+	let mut rnd = rand::thread_rng();
+	let mut rnd = XorShiftRng::from_seed(rnd.gen());
+	let n = Normal::new(0.0, 1.0).unwrap();
+
+	let r = NNModel::with_unit_initializer(
+				NNUnits::new(2, (4,Box::new(FReLU::new())), (4,Box::new(FReLU::new())))
+				.add((1,Box::new(FSigmoid::new()))),
+				TextFileInputReader::new("data/contain_whitespace.txt").unwrap(),
+				move || {
+					n.sample(&mut rnd)
+				});
+	assert!(r.is_ok());
+}
+#[test]
 fn test_textfile_input_reader_wrong_input_extra_data() {
 	let mut rnd = rand::thread_rng();
 	let mut rnd = XorShiftRng::from_seed(rnd.gen());
@@ -49,14 +65,7 @@ fn test_textfile_input_reader_wrong_input_extra_data() {
 				});
 	match r {
 		Err(StartupError::Fail(ConfigReadError::InvalidState(s))) => {
-			match &*s {
-				"Data loaded , but the input has not reached the end." => {
-					assert!(true);
-				},
-				_ => {
-					assert!(false);
-				}
-			}
+			assert_eq!(String::from("Data loaded , but the input has not reached the end."),s);
 		},
 		_ => {
 			assert!(false);
@@ -78,14 +87,7 @@ fn test_binfile_input_reader_wrong_input_extra_data() {
 				});
 	match r {
 		Err(StartupError::Fail(ConfigReadError::InvalidState(s))) => {
-			match &*s {
-				"Data loaded , but the input has not reached the end." => {
-					assert!(true);
-				},
-				_ => {
-					assert!(false);
-				}
-			}
+			assert_eq!(String::from("Data loaded , but the input has not reached the end."),s);
 		},
 		_ => {
 			assert!(false);
@@ -107,14 +109,7 @@ fn test_textfile_input_reader_wrong_input_data_too_short() {
 				});
 	match r {
 		Err(StartupError::Fail(ConfigReadError::InvalidState(s))) => {
-			match &*s {
-				"End of input has been reached." => {
-					assert!(true);
-				},
-				_ => {
-					assert!(false);
-				}
-			}
+			assert_eq!(String::from("End of input has been reached."),s);
 		},
 		_ => {
 			assert!(false);
@@ -507,5 +502,41 @@ fn test_relu_and_adam() {
 		i.extend(&p.0);
 		let nnanswer = nn.solve(&i).unwrap();
 		assert!(validator(&nnanswer));
+	}
+}
+#[test]
+fn test_latter_part_of_learning_with_not_consistent_snapshot() {
+	let mut rnd = rand::thread_rng();
+	let mut rnd = XorShiftRng::from_seed(rnd.gen());
+	let n = Normal::new(0.0, 1.0).unwrap();
+
+	let model = NNModel::with_unit_initializer(
+									NNUnits::new(2, (4,Box::new(FReLU::new())), (4,Box::new(FReLU::new())))
+										.add((1,Box::new(FSigmoid::new()))),
+									TextFileInputReader::new("data/initial_nn.txt").unwrap(),
+									move || {
+										n.sample(&mut rnd)
+									}).unwrap();
+	let mut nn = NN::new(model,|_| SGD::new(0.05),Mse::new());
+
+	let pair = ([0f64,1f64],[1f64]);
+
+	let mut i = Vec::new();
+	i.extend(&pair.0);
+	let mut t = Vec::new();
+	t.extend(&pair.1);
+	let snapshot = nn.promise_of_learn(&i).unwrap();
+	let _ = nn.promise_of_learn(&i).unwrap();
+
+	let r = nn.latter_part_of_learning(&t,&snapshot);
+
+	match r {
+		Err(InvalidStateError::GenerationError(s)) => {
+			assert_eq!(String::from(
+				"Snapshot and model generation do not match. The snapshot used for learning needs to be the latest one."),s);
+		},
+		_ => {
+			assert!(false);
+		}
 	}
 }
