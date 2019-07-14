@@ -241,6 +241,9 @@ impl NNModel {
 					};
 					layers.push(reader.read_vec(size as usize,sizeb as usize)?);
 				}
+
+				reader.verify_eof()?;
+
 				layers
 			},
 			false => initializer(),
@@ -495,6 +498,7 @@ impl SnapShot {
 pub trait InputReader<E> where E: Error + fmt::Debug, StartupError<E>: From<E> {
 	fn read_vec(&mut self,usize,usize) -> Result<Vec<Vec<f64>>,E>;
 	fn source_exists(&mut self) -> bool;
+	fn verify_eof(&mut self) -> Result<(),E>;
 }
 pub trait ModelInputReader<E> where E: Error + fmt::Debug, StartupError<E>: From<E> {
 	fn read_model<'a>(&mut self) -> Result<NNModel, E>;

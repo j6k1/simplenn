@@ -118,6 +118,7 @@ impl InputReader<ConfigReadError> for TextFileInputReader where ConfigReadError:
 			}
 			v.push(u);
 		}
+
 		Ok(v)
 	}
 
@@ -125,6 +126,34 @@ impl InputReader<ConfigReadError> for TextFileInputReader where ConfigReadError:
 		match self.reader {
 			Some(_) => true,
 			None => false,
+		}
+	}
+
+	fn verify_eof(&mut self) -> Result<(),ConfigReadError>
+		where ConfigReadError: Error + fmt::Debug, StartupError<ConfigReadError>: From<ConfigReadError> {
+		match self.reader {
+			Some(ref mut reader) => {
+				let mut buf = String::new();
+
+				loop {
+					let n = reader.read_line(&mut buf)?;
+
+					if n == 0 {
+						return Ok(());
+					}
+
+					buf = buf.trim().to_string();
+
+					if !buf.is_empty() {
+						return Err(ConfigReadError::InvalidState(
+									String::from("Data loaded , but the input has not reached the end.")));
+					} else {
+						buf.clear();
+					}
+				}
+			},
+			None => Err(ConfigReadError::InvalidState(String::from(
+													"The file does not exist yet."))),
 		}
 	}
 }
@@ -210,6 +239,7 @@ impl InputReader<ConfigReadError> for BinFileInputReader where ConfigReadError: 
 			}
 			v.push(u);
 		}
+
 		Ok(v)
 	}
 
@@ -217,6 +247,25 @@ impl InputReader<ConfigReadError> for BinFileInputReader where ConfigReadError: 
 		match self.reader {
 			Some(_) => true,
 			None => false,
+		}
+	}
+
+	fn verify_eof(&mut self) -> Result<(),ConfigReadError>
+		where ConfigReadError: Error + fmt::Debug, StartupError<ConfigReadError>: From<ConfigReadError> {
+		match self.reader {
+			Some(ref mut reader) => {
+				let mut buf:[u8; 1] = [0];
+
+				let n = reader.read(&mut buf)?;
+
+				if n == 0 {
+					Ok(())
+				} else {
+					Err(ConfigReadError::InvalidState(String::from("Data loaded , but the input has not reached the end.")))
+				}
+			},
+			None => Err(ConfigReadError::InvalidState(String::from(
+													"The file does not exist yet."))),
 		}
 	}
 }
