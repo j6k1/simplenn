@@ -37,37 +37,37 @@ impl<O,E> NN<O,E> where O: Optimizer, E: LossFunction {
 		}
 	}
 
-	pub fn promise_of_learn(&mut self,input:&Vec<f64>) ->
+	pub fn promise_of_learn(&mut self,input:&[f64]) ->
 		Result<SnapShot,InvalidStateError> {
 
 		self.model.promise_of_learn(input)
 	}
 
-	pub fn solve(&self,input:&Vec<f64>) ->
+	pub fn solve(&self,input:&[f64]) ->
 		Result<Vec<f64>,InvalidStateError> {
 
 		self.model.solve(input)
 	}
 
-	pub fn solve_shapshot(&self,input:&Vec<f64>) ->
+	pub fn solve_shapshot(&self,input:&[f64]) ->
 		Result<SnapShot,InvalidStateError> {
 
 		self.model.solve_shapshot(input)
 	}
 
-	pub fn solve_diff(&self,input:&Vec<(usize,f64)>,snapshot:&SnapShot) ->
+	pub fn solve_diff(&self,input:&[(usize,f64)],snapshot:&SnapShot) ->
 		Result<SnapShot,InvalidStateError> {
 
 		self.model.solve_diff(input,snapshot)
 	}
 
-	pub fn learn(&mut self,input:&Vec<f64>,t:&Vec<f64>) -> Result<(),InvalidStateError>
+	pub fn learn(&mut self,input:&[f64],t:&[f64]) -> Result<(),InvalidStateError>
 		where O: Optimizer, E: LossFunction {
 
 		Ok(self.model.learn(input,&t,&mut self.optimizer,&self.lossf)?)
 	}
 
-	pub fn latter_part_of_learning(&mut self, t:&Vec<f64>,s:&SnapShot) ->
+	pub fn latter_part_of_learning(&mut self, t:&[f64],s:&SnapShot) ->
 		Result<(),InvalidStateError> {
 
 		Ok(self.model.latter_part_of_learning(t,s,&mut self.optimizer,&self.lossf)?)
@@ -267,7 +267,7 @@ impl NNModel {
 		)
 	}
 
-	pub fn apply<F,R>(&self,input:&Vec<f64>,after_callback:F) -> Result<R,InvalidStateError>
+	pub fn apply<F,R>(&self,input:&[f64],after_callback:F) -> Result<R,InvalidStateError>
 		where F: Fn(Vec<f64>,Vec<Vec<f64>>,Vec<Vec<f64>>) -> Result<R,InvalidStateError> {
 		if input.len() != self.units[0].0 {
 			return Err(InvalidStateError::InvalidInput(String::from(
@@ -302,7 +302,7 @@ impl NNModel {
 		self.apply_middle_and_out(o,u,after_callback)
 	}
 
-	pub fn apply_diff<F,R>(&self,input:&Vec<(usize,f64)>,s:&SnapShot,after_callback:F) -> Result<R,InvalidStateError>
+	pub fn apply_diff<F,R>(&self,input:&[(usize,f64)],s:&SnapShot,after_callback:F) -> Result<R,InvalidStateError>
 		where F: Fn(Vec<f64>,Vec<Vec<f64>>,Vec<Vec<f64>>) -> Result<R,InvalidStateError> {
 		let mut o:Vec<Vec<f64>> = Vec::with_capacity(self.units.len());
 		let mut u:Vec<Vec<f64>> = Vec::with_capacity(self.units.len());
@@ -394,7 +394,7 @@ impl NNModel {
 		after_callback(r,o,u)
 	}
 
-	fn latter_part_of_learning<O,E>(&mut self, t:&Vec<f64>,s:&SnapShot,optimizer:&mut O,lossf:&E) ->
+	fn latter_part_of_learning<O,E>(&mut self, t:&[f64],s:&SnapShot,optimizer:&mut O,lossf:&E) ->
 		Result<(),InvalidStateError> where O: Optimizer, E: LossFunction {
 
 		if s.hash.map(|h| h != self.hash).unwrap_or(false) {
@@ -498,17 +498,17 @@ impl NNModel {
 		Ok(())
 	}
 
-	fn solve(&self,input:&Vec<f64>) ->
+	fn solve(&self,input:&[f64]) ->
 		Result<Vec<f64>,InvalidStateError> {
 
 		self.apply(input,|r,_,_| Ok(r))
 	}
 
-	fn solve_diff(&self,input:&Vec<(usize,f64)>,s:&SnapShot) -> Result<SnapShot,InvalidStateError> {
+	fn solve_diff(&self,input:&[(usize,f64)],s:&SnapShot) -> Result<SnapShot,InvalidStateError> {
 		self.apply_diff(input,s,|r,o,u| Ok(SnapShot::new(r,o,u,None)))
 	}
 
-	fn learn<O,E>(&mut self,input:&Vec<f64>,t:&Vec<f64>,optimizer:&mut O,lossf:&E) -> Result<(),InvalidStateError>
+	fn learn<O,E>(&mut self,input:&[f64],t:&[f64],optimizer:&mut O,lossf:&E) -> Result<(),InvalidStateError>
 		where O: Optimizer, E: LossFunction {
 
 		let s = self.promise_of_learn(input)?;
@@ -516,12 +516,12 @@ impl NNModel {
 		self.latter_part_of_learning(t,&s,optimizer,lossf)
 	}
 
-	fn solve_shapshot(&self,input:&Vec<f64>) ->
+	fn solve_shapshot(&self,input:&[f64]) ->
 		Result<SnapShot,InvalidStateError> {
 		self.apply(input,|r,o,u| Ok(SnapShot::new(r,o,u,None)))
 	}
 
-	fn promise_of_learn(&mut self,input:&Vec<f64>) ->
+	fn promise_of_learn(&mut self,input:&[f64]) ->
 		Result<SnapShot,InvalidStateError> {
 
 		let mut rnd = rand::thread_rng();

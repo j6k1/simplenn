@@ -1,5 +1,5 @@
 pub trait ActivateF: Send + Sync + 'static {
-	fn apply(&self,u:f64,v:&Vec<f64>) -> f64;
+	fn apply(&self,u:f64,v:&[f64]) -> f64;
 	fn derive(&self,e:f64) -> f64;
 	fn kind(&self) -> &str;
 }
@@ -11,7 +11,7 @@ impl FIdentity {
 	}
 }
 impl ActivateF for FIdentity {
-	fn apply(&self,u:f64,_:&Vec<f64>) -> f64 {
+	fn apply(&self,u:f64,_:&[f64]) -> f64 {
 		u
 	}
 
@@ -32,7 +32,7 @@ impl FSigmoid {
 	}
 }
 impl ActivateF for FSigmoid {
-	fn apply(&self,u:f64,_:&Vec<f64>) -> f64 {
+	fn apply(&self,u:f64,_:&[f64]) -> f64 {
 		1.0 / (1.0 + (-u).exp())
 	}
 
@@ -56,7 +56,7 @@ impl FReLU {
 	}
 }
 impl ActivateF for FReLU {
-	fn apply(&self,u:f64,_:&Vec<f64>) -> f64 {
+	fn apply(&self,u:f64,_:&[f64]) -> f64 {
 		match u {
 			u if u > 0f64 => {
 				u
@@ -87,7 +87,7 @@ impl FTanh {
 	}
 }
 impl ActivateF for FTanh {
-	fn apply(&self,u:f64,_:&Vec<f64>) -> f64 {
+	fn apply(&self,u:f64,_:&[f64]) -> f64 {
 		u.tanh()
 	}
 
@@ -108,7 +108,7 @@ impl FSoftMax {
 	}
 }
 impl ActivateF for FSoftMax {
-	fn apply(&self,u:f64,v:&Vec<f64>) -> f64 {
+	fn apply(&self,u:f64,v:&[f64]) -> f64 {
 		let alpha = v.iter().fold(0.0/0.0, |m,v| v.max(m));
 		let numer = (u - alpha).exp();
 		numer / v.iter().fold(0.0f64,|acc, &x| acc + (x - alpha).exp())
