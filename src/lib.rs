@@ -49,6 +49,18 @@ impl<O,E> NN<O,E> where O: Optimizer, E: LossFunction {
 		self.model.solve(input)
 	}
 
+	pub fn solve_shapshot(&self,input:&Vec<f64>) ->
+		Result<SnapShot,InvalidStateError> {
+
+		self.model.solve_shapshot(input)
+	}
+
+	pub fn solve_diff(&self,input:&Vec<(usize,f64)>,snapshot:&SnapShot) ->
+		Result<SnapShot,InvalidStateError> {
+
+		self.model.solve_diff(input,snapshot)
+	}
+
 	pub fn learn(&mut self,input:&Vec<f64>,t:&Vec<f64>) -> Result<(),InvalidStateError>
 		where O: Optimizer, E: LossFunction {
 
@@ -287,7 +299,42 @@ impl NNModel {
 			}
 		}
 
-		o.	push(Vec::with_capacity(self.units[1].0 + 1));
+		self.apply_middle_and_out(o,u,after_callback)
+	}
+
+	pub fn apply_diff<F,R>(&self,input:&Vec<(usize,f64)>,s:&SnapShot,after_callback:F) -> Result<R,InvalidStateError>
+		where F: Fn(Vec<f64>,Vec<Vec<f64>>,Vec<Vec<f64>>) -> Result<R,InvalidStateError> {
+		let mut o:Vec<Vec<f64>> = Vec::with_capacity(self.units.len());
+		let mut u:Vec<Vec<f64>> = Vec::with_capacity(self.units.len());
+
+		u.push(s.u[0].clone());
+
+		let mut oi:Vec<f64> = s.o[0].clone();
+
+		for &(i,d) in input {
+			// インデックス0はバイアスのユニットなので一つ右にずらす
+			oi[i+1] += d;
+		}
+
+		o.push(oi);
+
+		let mut ui = s.u[1].clone();
+
+		for &(i,d) in input {
+			// インデックス0はバイアスのユニットなので一つ右にずらす
+			for (u,w) in ui.iter_mut().skip(1).zip(&self.layers[0][i+1]) {
+				*u += d * w;
+			}
+		}
+
+		u.push(ui);
+
+		self.apply_middle_and_out(o,u,after_callback)
+	}
+
+	fn apply_middle_and_out<F,R>(&self,mut o:Vec<Vec<f64>>,mut u:Vec<Vec<f64>>,after_callback:F) -> Result<R,InvalidStateError>
+		where F: Fn(Vec<f64>,Vec<Vec<f64>>,Vec<Vec<f64>>) -> Result<R,InvalidStateError> {
+		o.push(Vec::with_capacity(self.units[1].0 + 1));
 		o[1].resize(self.units[1].0 + 1, 0f64);
 
 		let f:&Box<ActivateF> = match self.units[1].1 {
@@ -350,7 +397,7 @@ impl NNModel {
 	fn latter_part_of_learning<O,E>(&mut self, t:&Vec<f64>,s:&SnapShot,optimizer:&mut O,lossf:&E) ->
 		Result<(),InvalidStateError> where O: Optimizer, E: LossFunction {
 
-		if s.hash != self.hash {
+		if s.hash.map(|h| h != self.hash).unwrap_or(false) {
 			return Err(InvalidStateError::GenerationError(String::from(
 				"Snapshot and model generation do not match. The snapshot used for learning needs to be the latest one."
 			)));
@@ -457,12 +504,21 @@ impl NNModel {
 		self.apply(input,|r,_,_| Ok(r))
 	}
 
+	fn solve_diff(&self,input:&Vec<(usize,f64)>,s:&SnapShot) -> Result<SnapShot,InvalidStateError> {
+		self.apply_diff(input,s,|r,o,u| Ok(SnapShot::new(r,o,u,None)))
+	}
+
 	fn learn<O,E>(&mut self,input:&Vec<f64>,t:&Vec<f64>,optimizer:&mut O,lossf:&E) -> Result<(),InvalidStateError>
 		where O: Optimizer, E: LossFunction {
 
 		let s = self.promise_of_learn(input)?;
 
 		self.latter_part_of_learning(t,&s,optimizer,lossf)
+	}
+
+	fn solve_shapshot(&self,input:&Vec<f64>) ->
+		Result<SnapShot,InvalidStateError> {
+		self.apply(input,|r,o,u| Ok(SnapShot::new(r,o,u,None)))
 	}
 
 	fn promise_of_learn(&mut self,input:&Vec<f64>) ->
@@ -472,17 +528,17 @@ impl NNModel {
 		let mut rnd = XorShiftRng::from_seed(rnd.gen());
 		self.hash = rnd.gen();
 
-		self.apply(input,|r,o,u| Ok(SnapShot::new(r,o,u,self.hash)))
+		self.apply(input,|r,o,u| Ok(SnapShot::new(r,o,u,Some(self.hash))))
 	}
 }
 pub struct SnapShot {
 	pub r:Vec<f64>,
 	o:Vec<Vec<f64>>,
 	u:Vec<Vec<f64>>,
-	hash:u64,
+	hash:Option<u64>,
 }
 impl SnapShot {
-	pub fn new(r:Vec<f64>,o:Vec<Vec<f64>>,u:Vec<Vec<f64>>,hash:u64) -> SnapShot {
+	pub fn new(r:Vec<f64>,o:Vec<Vec<f64>>,u:Vec<Vec<f64>>,hash:Option<u64>) -> SnapShot {
 		SnapShot {
 			r:r,
 			o:o,
