@@ -17,7 +17,7 @@ impl<E> fmt::Display for StartupError<E> {
 		}
 	}
 }
-impl<E> error::Error for StartupError<E> where E: Error + fmt::Debug {
+impl<E> error::Error for StartupError<E> where E: Error + fmt::Debug + 'static {
 	fn description(&self) -> &str {
 		match *self {
 			StartupError::InvalidConfiguration(_) => "Configuration is invalid.",
@@ -25,7 +25,7 @@ impl<E> error::Error for StartupError<E> where E: Error + fmt::Debug {
 		}
 	}
 
-	fn cause(&self) -> Option<&error::Error> {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
 		match *self {
 			StartupError::InvalidConfiguration(_) => None,
 			StartupError::Fail(ref e) => Some(e),
@@ -61,7 +61,7 @@ impl error::Error for ConfigReadError {
 		}
 	}
 
-	fn cause(&self) -> Option<&error::Error> {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
 		match *self {
 			ConfigReadError::IOError(ref e) => Some(e),
 			ConfigReadError::InvalidState(_) => None,
@@ -100,7 +100,7 @@ impl error::Error for InvalidStateError {
 	 	}
 	 }
 
-	fn cause(&self) -> Option<&error::Error> {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
 	 	match *self {
 	 		InvalidStateError::InvalidInput(_) => None,
 	 		InvalidStateError::GenerationError(_) => None,
@@ -125,7 +125,7 @@ impl<E> error::Error for PersistenceError<E> where E: Error + fmt::Debug {
 		}
 	}
 
-	fn cause(&self) -> Option<&error::Error> {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
 	 	match *self {
 	 		PersistenceError::Fail(_) => None,
 	 	}
@@ -154,7 +154,7 @@ impl error::Error for PersistenceWriteError {
 		}
 	}
 
-	fn cause(&self) -> Option<&error::Error> {
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
 	 	match *self {
 	 		PersistenceWriteError::IOError(ref e) => Some(e),
 	 	}

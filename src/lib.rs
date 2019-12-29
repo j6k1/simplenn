@@ -82,11 +82,11 @@ impl<O,E> NN<O,E> where O: Optimizer, E: LossFunction {
 }
 pub struct NNUnits {
 	input_units:usize,
-	defs:Vec<(usize,Box<ActivateF>)>,
+	defs:Vec<(usize,Box<dyn ActivateF>)>,
 }
 impl NNUnits {
-	pub fn new(input_units:usize, l1:(usize,Box<ActivateF>),l2:(usize,Box<ActivateF>)) -> NNUnits {
-		let mut defs:Vec<(usize,Box<ActivateF>)> = Vec::new();
+	pub fn new(input_units:usize, l1:(usize,Box<dyn ActivateF>),l2:(usize,Box<dyn ActivateF>)) -> NNUnits {
+		let mut defs:Vec<(usize,Box<dyn ActivateF>)> = Vec::new();
 		defs.push(l1);
 		defs.push(l2);
 		NNUnits {
@@ -95,13 +95,13 @@ impl NNUnits {
 		}
 	}
 
-	pub fn add(mut self, units:(usize,Box<ActivateF>)) -> NNUnits {
+	pub fn add(mut self, units:(usize,Box<dyn ActivateF>)) -> NNUnits {
 		self.defs.push(units);
 		self
 	}
 }
 pub struct NNModel {
-	units:Vec<(usize,Option<Box<ActivateF>>)>,
+	units:Vec<(usize,Option<Box<dyn ActivateF>>)>,
 	layers:Vec<Vec<Vec<f64>>>,
 	hash:u64,
 }
@@ -111,7 +111,7 @@ impl NNModel {
 		reader.read_model()
 	}
 
-	pub fn new<E>(units:Vec<(usize,Option<Box<ActivateF>>)>,layers:Vec<Vec<Vec<f64>>>) -> Result<NNModel,StartupError<E>>
+	pub fn new<E>(units:Vec<(usize,Option<Box<dyn ActivateF>>)>,layers:Vec<Vec<Vec<f64>>>) -> Result<NNModel,StartupError<E>>
 		where E: Error + fmt::Debug, StartupError<E>: From<E> {
 
 		let mut rnd = rand::thread_rng();
@@ -230,7 +230,7 @@ impl NNModel {
 
 		let iunits = units.input_units;
 
-		let mut units:Vec<(usize,Option<Box<ActivateF>>)> = units
+		let mut units:Vec<(usize,Option<Box<dyn ActivateF>>)> = units
 															.defs
 															.into_iter()
 															.map(|(u,f)| (u, Some(f)))
@@ -337,7 +337,7 @@ impl NNModel {
 		o.push(Vec::with_capacity(self.units[1].0 + 1));
 		o[1].resize(self.units[1].0 + 1, 0f64);
 
-		let f:&Box<ActivateF> = match self.units[1].1 {
+		let f:&Box<dyn ActivateF> = match self.units[1].1 {
 			Some(ref f) => f,
 			None => {
 				return Err(InvalidStateError::InvalidInput(String::from(
@@ -357,7 +357,7 @@ impl NNModel {
 			let mut ul:Vec<f64> = Vec::with_capacity(self.units[ll].0 + 1);
 			ul.resize(self.units[ll].0 + 1, 0f64);
 			u.push(ul);
-			let f:&Box<ActivateF> = match self.units[ll].1 {
+			let f:&Box<dyn ActivateF> = match self.units[ll].1 {
 				Some(ref f) => f,
 				None => {
 					return Err(InvalidStateError::InvalidInput(String::from(
@@ -414,7 +414,7 @@ impl NNModel {
 			layers.push(layer);
 		}
 
-		let f:&Box<ActivateF> = match self.units[self.units.len()-1].1 {
+		let f:&Box<dyn ActivateF> = match self.units[self.units.len()-1].1 {
 			Some(ref f) => f,
 			None => {
 				return Err(InvalidStateError::InvalidInput(String::from(
@@ -457,7 +457,7 @@ impl NNModel {
 		for l in (1..self.units.len()-1).rev() {
 			let hl = l - 1;
 			let ll = l + 1;
-			let f:&Box<ActivateF> = match self.units[l].1 {
+			let f:&Box<dyn ActivateF> = match self.units[l].1 {
 				Some(ref f) => f,
 				None => {
 					return Err(InvalidStateError::InvalidInput(String::from(

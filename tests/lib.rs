@@ -167,7 +167,7 @@ fn test_relu_and_sigmoid() {
 		}
 	}
 
-	let validator:[Box<Fn(&Vec<f64>) -> bool>; 4] = [
+	let validator:[Box<dyn Fn(&[f64]) -> bool>; 4] = [
 		Box::new(|v| v[0] <= 0.1f64),
 		Box::new(|v| v[0] >= 0.9f64),
 		Box::new(|v| v[0] >= 0.9f64),
@@ -210,7 +210,7 @@ fn test_relu_and_tanh() {
 		}
 	}
 
-	let validator:[Box<Fn(&Vec<f64>) -> bool>; 4] = [
+	let validator:[Box<dyn Fn(&[f64]) -> bool>; 4] = [
 		Box::new(|v| v[0] <= 0.1f64),
 		Box::new(|v| v[0] >= 0.9f64),
 		Box::new(|v| v[0] >= 0.9f64),
@@ -253,7 +253,7 @@ fn test_relu_and_identity_and_sigmoid() {
 		}
 	}
 
-	let validator:[Box<Fn(&Vec<f64>) -> bool>; 4] = [
+	let validator:[Box<dyn Fn(&[f64]) -> bool>; 4] = [
 		Box::new(|v| v[0] <= 0.1f64),
 		Box::new(|v| v[0] >= 0.9f64),
 		Box::new(|v| v[0] >= 0.9f64),
@@ -309,7 +309,7 @@ fn test_fizzbuzz() {
 	}
 
 	for v in 101..111 {
-		let mut i = bits_to_vec(v);
+		let i = bits_to_vec(v);
 
 		let answer = if v % 15 == 0 {
 			0
@@ -361,7 +361,7 @@ fn test_cross_entropy() {
 		}
 	}
 
-	let validator:[Box<Fn(&Vec<f64>) -> bool>; 4] = [
+	let validator:[Box<dyn Fn(&[f64]) -> bool>; 4] = [
 		Box::new(|v| v[0] <= 0.1f64),
 		Box::new(|v| v[0] >= 0.9f64),
 		Box::new(|v| v[0] >= 0.9f64),
@@ -404,7 +404,7 @@ fn test_relu_and_adagrad() {
 		}
 	}
 
-	let validator:[Box<Fn(&Vec<f64>) -> bool>; 4] = [
+	let validator:[Box<dyn Fn(&[f64]) -> bool>; 4] = [
 		Box::new(|v| v[0] <= 0.1f64),
 		Box::new(|v| v[0] >= 0.85f64),
 		Box::new(|v| v[0] >= 0.85f64),
@@ -447,7 +447,7 @@ fn test_relu_and_rmsprop() {
 		}
 	}
 
-	let validator:[Box<Fn(&Vec<f64>) -> bool>; 4] = [
+	let validator:[Box<dyn Fn(&[f64]) -> bool>; 4] = [
 		Box::new(|v| v[0] <= 0.1f64),
 		Box::new(|v| v[0] >= 0.85f64),
 		Box::new(|v| v[0] >= 0.85f64),
@@ -490,7 +490,7 @@ fn test_relu_and_adam() {
 		}
 	}
 
-	let validator:[Box<Fn(&Vec<f64>) -> bool>; 4] = [
+	let validator:[Box<dyn Fn(&[f64]) -> bool>; 4] = [
 		Box::new(|v| v[0] <= 0.1f64),
 		Box::new(|v| v[0] >= 0.9f64),
 		Box::new(|v| v[0] >= 0.9f64),
@@ -533,7 +533,7 @@ fn test_sgd_with_weight_decay_lambda() {
 		}
 	}
 
-	let validator:[Box<Fn(&Vec<f64>) -> bool>; 4] = [
+	let validator:[Box<dyn Fn(&[f64]) -> bool>; 4] = [
 		Box::new(|v| v[0] <= 0.1f64),
 		Box::new(|v| v[0] >= 0.9f64),
 		Box::new(|v| v[0] >= 0.9f64),
