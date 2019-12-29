@@ -37,9 +37,7 @@ impl ActivateF for FSigmoid {
 	}
 
 	fn derive(&self,e:f64) -> f64 {
-		let v:Vec<f64> = Vec::new();
-
-		let e = self.apply(e,&v);
+		let e = 1.0 / (1.0 + (-e).exp());
 		e * (1f64 - e)
 	}
 
