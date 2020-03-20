@@ -619,9 +619,9 @@ fn test_solve_diff() {
 	let input:Vec<Vec<(usize,f64)>> = vec![vec![(0,-1f64)],vec![(0,-1f64),(1,1f64)],vec![(1,1f64)]];
 	let mut answer = Vec::new();
 
-	for index in [0,1,3].into_iter() {
+	for &index in [0,1,3].iter() {
 		let mut i = Vec::new();
-		i.extend(&pairs[*index as usize].0);
+		i.extend(&pairs[index as usize].0);
 		let nnanswer = nn.solve(&i).unwrap();
 		answer.push(nnanswer);
 	}

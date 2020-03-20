@@ -12,7 +12,7 @@ pub enum StartupError<E> {
 impl<E> fmt::Display for StartupError<E> {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match *self {
-			StartupError::InvalidConfiguration(ref s) => write!(f, "{}",s),
+			StartupError::InvalidConfiguration(ref s) => write!(f, "Configuration is invalid. ({})",s),
 			StartupError::Fail(_) => write!(f, "Startup Failed."),
 		}
 	}
@@ -47,7 +47,7 @@ impl fmt::Display for ConfigReadError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match *self {
 			ConfigReadError::IOError(_) => write!(f, "Error occurred in file I/O."),
-			ConfigReadError::InvalidState(ref s) => write!(f, "{}",s),
+			ConfigReadError::InvalidState(ref s) => write!(f, "Configuration is invalid. ({})",s),
 			ConfigReadError::ParseFloatError(_) => write!(f, "An error occurred when converting a string to a double value."),
 		}
 	}
@@ -87,8 +87,8 @@ pub enum InvalidStateError {
 impl fmt::Display for InvalidStateError {
 	 fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 	 	match *self {
-	 		InvalidStateError::InvalidInput(ref s) => write!(f, "{}",s),
-	 		InvalidStateError::GenerationError(ref s) => write!(f, "{}",s),
+	 		InvalidStateError::InvalidInput(ref s) => write!(f, "The input value is invalid. ({})",s),
+	 		InvalidStateError::GenerationError(ref s) => write!(f, "The snapshot is invalid. ({})",s),
 	 	}
 	 }
 }
