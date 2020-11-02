@@ -17,8 +17,8 @@ use function::loss::*;
 use function::optimizer::*;
 
 pub struct Metrics {
-	error_total:f64,
-	error_average:f64
+	pub error_total:f64,
+	pub error_average:f64
 }
 pub struct NN<O,E> where O: Optimizer, E: LossFunction {
 	model:NNModel,
@@ -75,6 +75,12 @@ impl<O,E> NN<O,E> where O: Optimizer, E: LossFunction {
 		Result<Metrics,InvalidStateError> {
 
 		Ok(self.model.latter_part_of_learning(t,s,&mut self.optimizer,&self.lossf)?)
+	}
+
+	pub fn learn_batch<I>(&mut self,it:I) -> Result<Metrics,InvalidStateError>
+		where I: Iterator<Item = (Vec<f64>,Vec<f64>)> {
+
+		Ok(self.model.learn_batch(it,&mut self.optimizer,&self.lossf)?)
 	}
 
 	pub fn save<P,ERR>(&self,mut persistence:P) -> Result<(),PersistenceError<ERR>>
@@ -531,6 +537,137 @@ impl NNModel {
 		let s = self.promise_of_learn(input)?;
 
 		self.latter_part_of_learning(t,&s,optimizer,lossf)
+	}
+
+	fn learn_batch<O,E,I>(&mut self,it:I,optimizer:&mut O,lossf:&E) -> Result<Metrics,InvalidStateError>
+		where O: Optimizer, E: LossFunction, I: Iterator<Item = (Vec<f64>,Vec<f64>)> {
+
+		let mut batch_size = 0;
+		let mut de_dw_total:Vec<Vec<Vec<f64>>> = Vec::with_capacity(self.layers.len());
+
+		for l in 0..self.units.len() - 1 {
+			let mut layer:Vec<Vec<f64>> = Vec::with_capacity(self.units[l].0 + 1);
+
+			layer.resize(self.units[l].0 + 1,Vec::with_capacity(self.units[l+1].0 + 1));
+
+			for e in layer.iter_mut() {
+				e.resize(self.units[l+1].0 + 1,0f64);
+			}
+
+			de_dw_total.push(layer);
+		}
+
+		let mut metrics = Metrics {
+			error_total:0f64,
+			error_average:0f64
+		};
+
+		for (input,t) in it {
+			let s = self.promise_of_learn(&input)?;
+
+			let l = self.units.len()-1;
+
+			for k in 1..self.units[l].0 + 1 {
+				metrics.error_total += lossf.apply(s.r[k-1],t[k-1]);
+			}
+
+			let mut d:Vec<f64> = Vec::with_capacity(self.units[self.units.len()-1].0 + 1);
+			d.resize(self.units[self.units.len()-1].0 + 1, 0f64);
+
+			let f:&Box<dyn ActivateF> = match self.units[self.units.len()-1].1 {
+				Some(ref f) => f,
+				None => {
+					return Err(InvalidStateError::InvalidInput(String::from(
+						"Reference to the activation function object is not set."
+					)));
+				}
+			};
+
+			let hl = self.units.len()-2;
+			let l = self.units.len()-1;
+			match lossf.is_canonical_link(&f) {
+				true => {
+					for k in 1..self.units[l].0 + 1 {
+						d[k] = s.r[k-1] - t[k-1];
+					}
+				},
+				false => {
+					for k in 1..self.units[l].0 + 1 {
+						d[k] = (lossf.derive(s.r[k-1], t[k-1])) * f.derive(s.u[l][k]);
+					}
+				}
+			}
+
+			for i in 0..self.units[hl].0 + 1 {
+				let o = s.o[hl][i];
+				for j in 1..self.units[l].0 + 1 {
+					de_dw_total[hl][i][j-1] += d[j] * o;
+				}
+			}
+
+			for l in (1..self.units.len()-1).rev() {
+				let hl = l - 1;
+				let ll = l + 1;
+				let f:&Box<dyn ActivateF> = match self.units[l].1 {
+					Some(ref f) => f,
+					None => {
+						return Err(InvalidStateError::InvalidInput(String::from(
+							"Reference to the activation function object is not set."
+						)));
+					}
+				};
+
+				let mut nd:Vec<f64> = Vec::with_capacity(self.units[l].0 + 1);
+				nd.resize(self.units[l].0 + 1, 0f64);
+
+				for j in 1..self.units[l].0 + 1{
+					for k in 1..self.units[ll].0 + 1 {
+						nd[j] += self.layers[l][j][k-1] * d[k];
+					}
+					nd[j] = nd[j] * f.derive(s.u[l][j]);
+				}
+
+				for i in 0..self.units[hl].0 + 1 {
+					let o = s.o[hl][i];
+					for j in 1..self.units[l].0 + 1 {
+						de_dw_total[hl][i][j-1] += nd[j] * o;
+					}
+				}
+
+				d = nd;
+			}
+
+			batch_size += 1;
+		}
+
+		let mut layers:Vec<Vec<Vec<f64>>> = Vec::with_capacity(self.layers.len());
+
+		for l in 0..self.units.len() - 1 {
+			let mut layer:Vec<Vec<f64>> = Vec::with_capacity(self.units[l].0 + 1);
+
+			layer.resize(self.units[l].0 + 1,Vec::with_capacity(self.units[l+1].0 + 1));
+
+			for u in layer.iter_mut() {
+				u.resize(self.units[l+1].0 + 1,0f64);
+			}
+
+			layers.push(layer);
+		}
+
+		for l in (0..self.layers.len()).rev() {
+			for i in 0..self.layers[l].len() {
+				optimizer.update((l,i),&de_dw_total[l][i].iter()
+																.map(|e| e / batch_size as f64)
+																.collect::<Vec<f64>>(),
+								 							&self.layers[l][i],&mut layers[l][i]);
+			}
+		}
+
+		self.layers = layers;
+
+		metrics.error_average = metrics.error_total / batch_size as f64;
+
+		Ok(metrics)
 	}
 
 	fn solve_shapshot(&self,input:&[f64]) ->
