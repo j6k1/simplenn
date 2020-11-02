@@ -655,7 +655,7 @@ fn test_learn_batch() {
 		let pairs = pairs.clone();
 		let mut ii = 0;
 
-		let m = nn.learn_batch((0..4).map(move |_| {
+		nn.learn_batch((0..4).map(move |_| {
 			let mut i = Vec::new();
 			i.extend(&pairs[ii].0);
 			let mut t = Vec::new();
@@ -664,7 +664,7 @@ fn test_learn_batch() {
 
 			(i,t)
 		})).unwrap();
-		println!("{},{}",m.error_total,m.error_average);
+		//println!("{},{}",m.error_total,m.error_average);
 	}
 
 	let validator:[Box<dyn Fn(&[f64]) -> bool>; 4] = [
@@ -678,8 +678,8 @@ fn test_learn_batch() {
 		let mut i = Vec::new();
 		i.extend(&p.0);
 		let nnanswer = nn.solve(&i).unwrap();
-		println!("{:?}",&i);
-		println!("{:?}",nnanswer);
+		//println!("{:?}",&i);
+		//println!("{:?}",nnanswer);
 		assert!(validator(&nnanswer));
 	}
 }
