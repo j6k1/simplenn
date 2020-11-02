@@ -16,6 +16,10 @@ use function::activation::*;
 use function::loss::*;
 use function::optimizer::*;
 
+pub struct Metrics {
+	error_total:f64,
+	error_average:f64
+}
 pub struct NN<O,E> where O: Optimizer, E: LossFunction {
 	model:NNModel,
 	optimizer:O,
@@ -61,14 +65,14 @@ impl<O,E> NN<O,E> where O: Optimizer, E: LossFunction {
 		self.model.solve_diff(input,snapshot)
 	}
 
-	pub fn learn(&mut self,input:&[f64],t:&[f64]) -> Result<(),InvalidStateError>
+	pub fn learn(&mut self,input:&[f64],t:&[f64]) -> Result<Metrics,InvalidStateError>
 		where O: Optimizer, E: LossFunction {
 
 		Ok(self.model.learn(input,&t,&mut self.optimizer,&self.lossf)?)
 	}
 
 	pub fn latter_part_of_learning(&mut self, t:&[f64],s:&SnapShot) ->
-		Result<(),InvalidStateError> {
+		Result<Metrics,InvalidStateError> {
 
 		Ok(self.model.latter_part_of_learning(t,s,&mut self.optimizer,&self.lossf)?)
 	}
@@ -395,12 +399,23 @@ impl NNModel {
 	}
 
 	fn latter_part_of_learning<O,E>(&mut self, t:&[f64],s:&SnapShot,optimizer:&mut O,lossf:&E) ->
-		Result<(),InvalidStateError> where O: Optimizer, E: LossFunction {
+		Result<Metrics,InvalidStateError> where O: Optimizer, E: LossFunction {
 
 		if s.hash.map(|h| h != self.hash).unwrap_or(false) {
 			return Err(InvalidStateError::GenerationError(String::from(
 				"Snapshot and model generation do not match. The snapshot used for learning needs to be the latest one."
 			)));
+		}
+
+		let mut metrics = Metrics {
+			error_total:0f64,
+			error_average:0f64
+		};
+
+		let l = self.units.len()-1;
+
+		for k in 1..self.units[l].0 + 1 {
+			metrics.error_total += lossf.apply(s.r[k-1],t[k-1]);
 		}
 
 		let mut layers:Vec<Vec<Vec<f64>>> = Vec::with_capacity(self.units.len()-1);
@@ -495,7 +510,9 @@ impl NNModel {
 
 		self.layers = layers;
 
-		Ok(())
+		metrics.error_average = metrics.error_total;
+
+		Ok(metrics)
 	}
 
 	fn solve(&self,input:&[f64]) ->
@@ -508,7 +525,7 @@ impl NNModel {
 		self.apply_diff(input,s,|r,o,u| Ok(SnapShot::new(r,o,u,None)))
 	}
 
-	fn learn<O,E>(&mut self,input:&[f64],t:&[f64],optimizer:&mut O,lossf:&E) -> Result<(),InvalidStateError>
+	fn learn<O,E>(&mut self,input:&[f64],t:&[f64],optimizer:&mut O,lossf:&E) -> Result<Metrics,InvalidStateError>
 		where O: Optimizer, E: LossFunction {
 
 		let s = self.promise_of_learn(input)?;
