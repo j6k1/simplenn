@@ -16,6 +16,7 @@ use function::activation::*;
 use function::loss::*;
 use function::optimizer::*;
 
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Metrics {
 	pub error_total:f64,
 	pub error_average:f64
