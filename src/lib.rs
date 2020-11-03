@@ -649,7 +649,7 @@ impl NNModel {
 			layer.resize(self.units[l].0 + 1,Vec::with_capacity(self.units[l+1].0 + 1));
 
 			for u in layer.iter_mut() {
-				u.resize(self.units[l+1].0 + 1,0f64);
+				u.resize(self.units[l+1].0,0f64);
 			}
 
 			layers.push(layer);
