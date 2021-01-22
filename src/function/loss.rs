@@ -1,6 +1,6 @@
 use function::activation::ActivateF;
 
-pub trait LossFunction {
+pub trait LossFunction: Send + Sync + 'static {
 	fn apply(&self,r:f64,t:f64) -> f64;
 	fn derive(&self,r:f64,t:f64) -> f64;
 	fn is_canonical_link(&self,_:&Box<dyn ActivateF>) -> bool {

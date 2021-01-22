@@ -8,6 +8,8 @@ pub mod persistence;
 use std::fmt;
 use error::*;
 use std::error::Error;
+use std::sync::{mpsc, Arc};
+
 use rand::Rng;
 use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
@@ -15,6 +17,7 @@ use rand_xorshift::XorShiftRng;
 use function::activation::*;
 use function::loss::*;
 use function::optimizer::*;
+use std::sync::mpsc::Receiver;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Metrics {
@@ -22,9 +25,9 @@ pub struct Metrics {
 	pub error_average:f64
 }
 pub struct NN<O,E> where O: Optimizer, E: LossFunction {
-	model:NNModel,
+	model:Arc<NNModel>,
 	optimizer:O,
-	lossf:E,
+	lossf:Arc<E>,
 }
 
 impl<O,E> NN<O,E> where O: Optimizer, E: LossFunction {
@@ -36,16 +39,21 @@ impl<O,E> NN<O,E> where O: Optimizer, E: LossFunction {
 			size += model.units[i].0 + 1;
 		}
 		NN {
-			model:model,
+			model:Arc::new(model),
 			optimizer:optimizer_creator(size),
-			lossf:lossf,
+			lossf:Arc::new(lossf),
 		}
 	}
 
 	pub fn promise_of_learn(&mut self,input:&[f64]) ->
 		Result<SnapShot,InvalidStateError> {
 
-		self.model.promise_of_learn(input)
+		match Arc::get_mut(&mut self.model) {
+			Some(ref mut model) => model.promise_of_learn(input),
+			None => {
+				Err(InvalidStateError::UpdateError(String::from("Failed get mutable reference to neural network.")))
+			}
+		}
 	}
 
 	pub fn solve(&self,input:&[f64]) ->
@@ -69,19 +77,46 @@ impl<O,E> NN<O,E> where O: Optimizer, E: LossFunction {
 	pub fn learn(&mut self,input:&[f64],t:&[f64]) -> Result<Metrics,InvalidStateError>
 		where O: Optimizer, E: LossFunction {
 
-		Ok(self.model.learn(input,&t,&mut self.optimizer,&self.lossf)?)
+		match Arc::get_mut(&mut self.model) {
+			Some(ref mut model) => {
+				Ok(model.learn(input,&t,&mut self.optimizer,&*self.lossf)?)
+			},
+			None => {
+				Err(InvalidStateError::UpdateError(String::from("Failed get mutable reference to neural network.")))
+			}
+		}
 	}
 
 	pub fn latter_part_of_learning(&mut self, t:&[f64],s:&SnapShot) ->
 		Result<Metrics,InvalidStateError> {
 
-		Ok(self.model.latter_part_of_learning(t,s,&mut self.optimizer,&self.lossf)?)
+		match Arc::get_mut(&mut self.model) {
+			Some(ref mut model) => {
+				Ok(model.latter_part_of_learning(t,s,&mut self.optimizer,&*self.lossf)?)
+			},
+			None => {
+				Err(InvalidStateError::UpdateError(String::from("Failed get mutable reference to neural network.")))
+			}
+		}
 	}
 
 	pub fn learn_batch<I>(&mut self,it:I) -> Result<Metrics,InvalidStateError>
 		where I: Iterator<Item = (Vec<f64>,Vec<f64>)> {
 
-		Ok(self.model.learn_batch(it,&mut self.optimizer,&self.lossf)?)
+		match Arc::get_mut(&mut self.model) {
+			Some(ref mut model) => {
+				Ok(model.learn_batch(it,&mut self.optimizer,&*self.lossf)?)
+			},
+			None => {
+				Err(InvalidStateError::UpdateError(String::from("Failed get mutable reference to neural network.")))
+			}
+		}
+	}
+
+	pub fn learn_batch_parallel<I>(&mut self,threads:usize,it:I) -> Result<Metrics,InvalidStateError>
+		where I: Iterator<Item = (Vec<f64>,Vec<f64>)> {
+
+		self.model.learn_batch_parallel(threads,it,&mut self.optimizer,self.lossf.clone())
 	}
 
 	pub fn save<P,ERR>(&self,mut persistence:P) -> Result<(),PersistenceError<ERR>>
@@ -669,6 +704,229 @@ impl NNModel {
 		metrics.error_average = metrics.error_total / batch_size as f64;
 
 		Ok(metrics)
+	}
+
+	fn learn_batch_parallel<O,E,I>(self:&mut Arc<Self>,threads:usize,it:I,optimizer:&mut O,lossf:Arc<E>) -> Result<Metrics,InvalidStateError>
+		where O: Optimizer,
+			  E: LossFunction,
+			  I: Iterator<Item = (Vec<f64>,Vec<f64>)>,
+			  NNModel: Send + Sync + 'static {
+		let samples = it.collect::<Vec<(Vec<f64>,Vec<f64>)>>();
+
+		let batch_size = samples.len();
+
+		let chunk_width = std::cmp::max(1,batch_size / threads);
+
+		let mut de_dw_total:Vec<Vec<Vec<f64>>> = Vec::with_capacity(self.layers.len());
+
+		for l in 0..self.units.len() - 1 {
+			let mut layer:Vec<Vec<f64>> = Vec::with_capacity(self.units[l].0 + 1);
+
+			layer.resize(self.units[l].0 + 1,Vec::with_capacity(self.units[l+1].0 + 1));
+
+			for e in layer.iter_mut() {
+				e.resize(self.units[l+1].0 + 1,0f64);
+			}
+
+			de_dw_total.push(layer);
+		}
+
+		let mut metrics = Metrics {
+			error_total:0f64,
+			error_average:0f64
+		};
+
+		let mut it = samples.into_iter();
+		let (sender,receiver):(_,Receiver<Result<(Vec<Vec<Vec<f64>>>,Metrics),InvalidStateError>>) = mpsc::channel();
+		let mut busy_threads = 0;
+		let mut has_remaining = true;
+
+		loop {
+			if !has_remaining && busy_threads == 0 {
+				break;
+			} else if busy_threads >= threads || !has_remaining {
+				let (de_dw_total_chunck, metrics_chunck) = receiver.recv().map_err(|_| {
+					InvalidStateError::ReceiveError(String::from("from learning thread."))
+				})??;
+
+				for (ti, ci) in de_dw_total.iter_mut().zip(de_dw_total_chunck.iter()) {
+					for (ti, ci) in ti.iter_mut().zip(ci.iter()) {
+						for (ti, ci) in ti.iter_mut().zip(ci.iter()) {
+							*ti += *ci;
+						}
+					}
+				}
+				metrics.error_total += metrics_chunck.error_total;
+				busy_threads -= 1;
+			} else if let Some(s) = it.next() {
+				let this = self.clone();
+				let lossf = lossf.clone();
+
+				let sender = sender.clone();
+
+				busy_threads += 1;
+
+				let mut samples = Vec::with_capacity(chunk_width);
+
+				samples.push(s);
+
+				let mut count = 1;
+
+				if count < chunk_width {
+					while let Some(s) = it.next() {
+						samples.push(s);
+						count += 1;
+
+						if count == chunk_width {
+							break;
+						}
+					}
+				}
+
+				let it = samples.into_iter();
+
+				std::thread::spawn(move || {
+					let f = move || {
+						let mut de_dw_total: Vec<Vec<Vec<f64>>> = Vec::with_capacity(this.layers.len());
+
+						for l in 0..this.units.len() - 1 {
+							let mut layer: Vec<Vec<f64>> = Vec::with_capacity(this.units[l].0 + 1);
+
+							layer.resize(this.units[l].0 + 1, Vec::with_capacity(this.units[l + 1].0 + 1));
+
+							for e in layer.iter_mut() {
+								e.resize(this.units[l + 1].0 + 1, 0f64);
+							}
+
+							de_dw_total.push(layer);
+						}
+
+						let mut metrics = Metrics {
+							error_total: 0f64,
+							error_average: 0f64
+						};
+
+						for (input,t) in it {
+							let s = this.apply(&input, |r, o, u| {
+								Ok(SnapShot::new(r, o, u, None))
+							})?;
+
+							let l = this.units.len() - 1;
+
+							for k in 1..this.units[l].0 + 1 {
+								metrics.error_total += lossf.apply(s.r[k - 1], t[k - 1]);
+							}
+
+							let mut d: Vec<f64> = Vec::with_capacity(this.units[this.units.len() - 1].0 + 1);
+							d.resize(this.units[this.units.len() - 1].0 + 1, 0f64);
+
+							let f: &Box<dyn ActivateF> = match this.units[this.units.len() - 1].1 {
+								Some(ref f) => f,
+								None => {
+									return Err(InvalidStateError::InvalidInput(String::from(
+										"Reference to the activation function object is not set."
+									)));
+								}
+							};
+
+							let hl = this.units.len() - 2;
+							let l = this.units.len() - 1;
+							match lossf.is_canonical_link(&f) {
+								true => {
+									for k in 1..this.units[l].0 + 1 {
+										d[k] = s.r[k - 1] - t[k - 1];
+									}
+								},
+								false => {
+									for k in 1..this.units[l].0 + 1 {
+										d[k] = (lossf.derive(s.r[k - 1], t[k - 1])) * f.derive(s.u[l][k]);
+									}
+								}
+							}
+
+							for i in 0..this.units[hl].0 + 1 {
+								let o = s.o[hl][i];
+								for j in 1..this.units[l].0 + 1 {
+									de_dw_total[hl][i][j - 1] += d[j] * o;
+								}
+							}
+
+							for l in (1..this.units.len() - 1).rev() {
+								let hl = l - 1;
+								let ll = l + 1;
+								let f: &Box<dyn ActivateF> = match this.units[l].1 {
+									Some(ref f) => f,
+									None => {
+										return Err(InvalidStateError::InvalidInput(String::from(
+											"Reference to the activation function object is not set."
+										)));
+									}
+								};
+
+								let mut nd: Vec<f64> = Vec::with_capacity(this.units[l].0 + 1);
+								nd.resize(this.units[l].0 + 1, 0f64);
+
+								for j in 1..this.units[l].0 + 1 {
+									for k in 1..this.units[ll].0 + 1 {
+										nd[j] += this.layers[l][j][k - 1] * d[k];
+									}
+									nd[j] = nd[j] * f.derive(s.u[l][j]);
+								}
+
+								for i in 0..this.units[hl].0 + 1 {
+									let o = s.o[hl][i];
+									for j in 1..this.units[l].0 + 1 {
+										de_dw_total[hl][i][j - 1] += nd[j] * o;
+									}
+								}
+
+								d = nd;
+							}
+						}
+
+						Ok((de_dw_total, metrics))
+					};
+					sender.send(f()).unwrap();
+				});
+			} else {
+				has_remaining = false;
+			}
+		}
+
+		metrics.error_average = metrics.error_total / batch_size as f64;
+
+		let mut layers:Vec<Vec<Vec<f64>>> = Vec::with_capacity(self.layers.len());
+
+		for l in 0..self.units.len() - 1 {
+			let mut layer:Vec<Vec<f64>> = Vec::with_capacity(self.units[l].0 + 1);
+
+			layer.resize(self.units[l].0 + 1,Vec::with_capacity(self.units[l+1].0 + 1));
+
+			for u in layer.iter_mut() {
+				u.resize(self.units[l+1].0,0f64);
+			}
+
+			layers.push(layer);
+		}
+
+		for l in (0..self.layers.len()).rev() {
+			for i in 0..self.layers[l].len() {
+				optimizer.update((l,i),&de_dw_total[l][i].iter()
+					.map(|e| e / batch_size as f64)
+					.collect::<Vec<f64>>(),
+								 &self.layers[l][i],&mut layers[l][i]);
+			}
+		}
+
+		match Arc::get_mut(self) {
+			Some(ref mut this) => {
+				this.layers = layers;
+				Ok(metrics)
+			},
+			None => {
+				Err(InvalidStateError::UpdateError(String::from("Failed get mutable reference to neural network.")))
+			}
+		}
 	}
 
 	fn solve_shapshot(&self,input:&[f64]) ->

@@ -83,12 +83,16 @@ impl From<ParseFloatError> for ConfigReadError {
 pub enum InvalidStateError {
 	InvalidInput(String),
 	GenerationError(String),
+	ReceiveError(String),
+	UpdateError(String),
 }
 impl fmt::Display for InvalidStateError {
 	 fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 	 	match *self {
 	 		InvalidStateError::InvalidInput(ref s) => write!(f, "The input value is invalid. ({})",s),
 	 		InvalidStateError::GenerationError(ref s) => write!(f, "The snapshot is invalid. ({})",s),
+			InvalidStateError::ReceiveError(ref s ) => write!(f, "Failed to receive the result from the thread. ({})",s),
+			InvalidStateError::UpdateError(ref s) => write!(f, "update failed. ({})",s),
 	 	}
 	 }
 }
@@ -96,7 +100,9 @@ impl error::Error for InvalidStateError {
 	 fn description(&self) -> &str {
 	 	match *self {
 	 		InvalidStateError::InvalidInput(_) => "The input value is invalid.",
-	 		InvalidStateError::GenerationError(_) => "The snapshot is invalid."
+	 		InvalidStateError::GenerationError(_) => "The snapshot is invalid.",
+			InvalidStateError::ReceiveError(_) => "Failed to receive the result from the thread.",
+			InvalidStateError::UpdateError(_) => "update failed.",
 	 	}
 	 }
 
@@ -104,6 +110,8 @@ impl error::Error for InvalidStateError {
 	 	match *self {
 	 		InvalidStateError::InvalidInput(_) => None,
 	 		InvalidStateError::GenerationError(_) => None,
+			InvalidStateError::ReceiveError(_) => None,
+			InvalidStateError::UpdateError(_) => None,
 	 	}
 	 }
 }

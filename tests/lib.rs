@@ -655,7 +655,57 @@ fn test_learn_batch() {
 		let pairs = pairs.clone();
 		let mut ii = 0;
 
-		nn.learn_batch((0..4).map(move |_| {
+		nn.learn_batch((0..40).map(move |_| {
+			let mut i = Vec::new();
+			i.extend(&pairs[ii].0);
+			let mut t = Vec::new();
+			t.extend(&pairs[ii].1);
+			ii = (ii + 1) % 4;
+
+			(i,t)
+		})).unwrap();
+		//println!("{},{}",m.error_total,m.error_average);
+	}
+
+	let validator:[Box<dyn Fn(&[f64]) -> bool>; 4] = [
+		Box::new(|v| v[0] <= 0.1f64),
+		Box::new(|v| v[0] >= 0.9f64),
+		Box::new(|v| v[0] >= 0.9f64),
+		Box::new(|v| v[0] <= 0.1f64),
+	];
+
+	for (p,validator) in pairs.iter().zip(&validator) {
+		let mut i = Vec::new();
+		i.extend(&p.0);
+		let nnanswer = nn.solve(&i).unwrap();
+		//println!("{:?}",&i);
+		//println!("{:?}",nnanswer);
+		assert!(validator(&nnanswer));
+	}
+}
+#[test]
+fn test_learn_batch_parallel() {
+	let mut rnd = rand::thread_rng();
+	let mut rnd = XorShiftRng::from_seed(rnd.gen());
+	let n = Normal::new(0.0, 1.0).unwrap();
+
+	let model = NNModel::with_unit_initializer(
+		NNUnits::new(2, (4,Box::new(FReLU::new())), (4,Box::new(FReLU::new())))
+			.add((1,Box::new(FSigmoid::new()))),
+		TextFileInputReader::new("data/initial_nn.txt").unwrap(),
+		move || {
+			n.sample(&mut rnd)
+		}).unwrap();
+	let mut nn = NN::new(model,|_| SGD::new(0.05),Mse::new());
+
+	let pairs:[([f64; 2],[f64; 1]); 4] = [([0f64,0f64],[0f64]),([0f64,1f64],[1f64]),([1f64,0f64],[1f64]),([1f64,1f64],[0f64])];
+	let mut v:Vec<([f64; 2],[f64; 1])> = Vec::new();
+	v.extend(&pairs);
+	for _ in 0..10000 {
+		let pairs = pairs.clone();
+		let mut ii = 0;
+
+		nn.learn_batch_parallel(32,(0..40).map(move |_| {
 			let mut i = Vec::new();
 			i.extend(&pairs[ii].0);
 			let mut t = Vec::new();
