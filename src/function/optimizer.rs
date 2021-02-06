@@ -98,7 +98,7 @@ impl Optimizer for MomentumSGD {
 
 		let lambda = self.lambda;
 		for ((w,wi),(vi,ei)) in wout.iter_mut().zip(win).zip(vt.iter_mut().zip(e)) {
-			*vi = *vi * mu - (1f64 - mu) * a * (ei + lambda * *wi);
+			*vi =  mu * *vi - (1f64 - mu) * a * (ei + lambda * *wi);
 			*w = *wi + *vi;
 		}
 	}
