@@ -280,7 +280,7 @@ fn test_fizzbuzz() {
 									move || {
 										n.sample(&mut rnd)
 									}).unwrap();
-	let mut nn = NN::new(model,|n| Adam::new(n),CrossEntropyMulticlass::new());
+	let mut nn = NN::new(model,|m| Adam::new(m),CrossEntropyMulticlass::new());
 
 	const FIZZBUZZ:[f64; 4] = [1f64,0f64,0f64,0f64];
 	const FIZZ:[f64; 4] = [0f64,1f64,0f64,0f64];
@@ -345,7 +345,7 @@ fn test_cross_entropy() {
 									move || {
 										n.sample(&mut rnd)
 									}).unwrap();
-	let mut nn = NN::new(model,|n| Adam::new(n),CrossEntropy::new());
+	let mut nn = NN::new(model,|m| Adam::new(m),CrossEntropy::new());
 
 	let pairs:[([f64; 2],[f64; 1]); 4] = [([0f64,0f64],[0f64]),([0f64,1f64],[1f64]),([1f64,0f64],[1f64]),([1f64,1f64],[0f64])];
 	let mut v:Vec<([f64; 2],[f64; 1])> = Vec::new();
@@ -388,7 +388,7 @@ fn test_relu_and_momentum_sgd() {
 		move || {
 			n.sample(&mut rnd)
 		}).unwrap();
-	let mut nn = NN::new(model,|n| MomentumSGD::new(n,0.01),CrossEntropy::new());
+	let mut nn = NN::new(model,|m| MomentumSGD::new(m,0.01),CrossEntropy::new());
 
 	let pairs:[([f64; 2],[f64; 1]); 4] = [([0f64,0f64],[0f64]),([0f64,1f64],[1f64]),([1f64,0f64],[1f64]),([1f64,1f64],[0f64])];
 	let mut v:Vec<([f64; 2],[f64; 1])> = Vec::new();
@@ -431,7 +431,7 @@ fn test_relu_and_adagrad() {
 									move || {
 										n.sample(&mut rnd)
 									}).unwrap();
-	let mut nn = NN::new(model,|n| Adagrad::new(n),CrossEntropy::new());
+	let mut nn = NN::new(model,|m| Adagrad::new(m),CrossEntropy::new());
 
 	let pairs:[([f64; 2],[f64; 1]); 4] = [([0f64,0f64],[0f64]),([0f64,1f64],[1f64]),([1f64,0f64],[1f64]),([1f64,1f64],[0f64])];
 	let mut v:Vec<([f64; 2],[f64; 1])> = Vec::new();
@@ -474,7 +474,7 @@ fn test_relu_and_rmsprop() {
 									move || {
 										n.sample(&mut rnd)
 									}).unwrap();
-	let mut nn = NN::new(model,|n| RMSprop::new(n),CrossEntropy::new());
+	let mut nn = NN::new(model,|m| RMSprop::new(m),CrossEntropy::new());
 
 	let pairs:[([f64; 2],[f64; 1]); 4] = [([0f64,0f64],[0f64]),([0f64,1f64],[1f64]),([1f64,0f64],[1f64]),([1f64,1f64],[0f64])];
 	let mut v:Vec<([f64; 2],[f64; 1])> = Vec::new();
@@ -517,7 +517,7 @@ fn test_relu_and_adam() {
 									move || {
 										n.sample(&mut rnd)
 									}).unwrap();
-	let mut nn = NN::new(model,|n| Adam::new(n),CrossEntropy::new());
+	let mut nn = NN::new(model,|m| Adam::new(m),CrossEntropy::new());
 
 	let pairs:[([f64; 2],[f64; 1]); 4] = [([0f64,0f64],[0f64]),([0f64,1f64],[1f64]),([1f64,0f64],[1f64]),([1f64,1f64],[0f64])];
 	let mut v:Vec<([f64; 2],[f64; 1])> = Vec::new();

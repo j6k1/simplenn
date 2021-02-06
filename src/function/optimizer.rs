@@ -1,25 +1,33 @@
-use std::collections::HashMap;
+use NNModel;
 
 pub trait Optimizer {
-	fn update(&mut self,k:(usize,usize),e:&[f64], win:&Vec<f64>,wout:&mut Vec<f64>);
+	fn update(&mut self,l:usize,u:usize,e:&[f64], win:&Vec<f64>,wout:&mut Vec<f64>);
 }
 pub struct Gradient {
-	g:HashMap<(usize,usize),Vec<f64>>
+	g:Vec<Vec<Vec<f64>>>
 }
 impl Gradient {
-	pub fn new(s:usize) -> Gradient {
+	pub fn new(model:&NNModel) -> Gradient {
+		let mut g = Vec::with_capacity(model.layers.len());
+
+		for layer in &model.layers {
+			let mut l = Vec::with_capacity(layer.len());
+
+			for unit in layer {
+				let u = vec![0f64; unit.len()];
+				l.push(u);
+			}
+
+			g.push(l);
+		}
+
 		Gradient {
-			g:HashMap::with_capacity(s),
+			g:g
 		}
 	}
 
-	pub fn get(&mut self,k:(usize,usize),s:usize) -> &mut Vec<f64> {
-		if !self.g.contains_key(&k) {
-			let mut g = Vec::with_capacity(s);
-			g.resize(s,0f64);
-			self.g.insert(k, g);
-		}
-		self.g.get_mut(&k).unwrap()
+	pub fn get(&mut self,l:usize,u:usize) -> &mut Vec<f64> {
+		&mut self.g[l][u]
 	}
 }
 pub struct SGD {
@@ -41,7 +49,7 @@ impl SGD {
 	}
 }
 impl Optimizer for SGD {
-	fn update(&mut self,_:(usize,usize),e:&[f64], win:&Vec<f64>,wout:&mut Vec<f64>) {
+	fn update(&mut self,_:usize,_:usize,e:&[f64], win:&Vec<f64>,wout:&mut Vec<f64>) {
 		let a = self.a;
 		let lambda = self.lambda;
 		for (w,(wi,ei)) in wout.iter_mut().zip(win.iter().zip(e)) {
@@ -56,34 +64,34 @@ pub struct MomentumSGD {
 	vt:Gradient
 }
 impl MomentumSGD {
-	pub fn new(s:usize,a:f64) -> MomentumSGD {
+	pub fn new(model:&NNModel,a:f64) -> MomentumSGD {
 		MomentumSGD {
 			a:a,
 			mu:0.9,
 			lambda:0.0f64,
-			vt:Gradient::new(s)
+			vt:Gradient::new(model)
 		}
 	}
-	pub fn with_mu(s:usize,a:f64,mu:f64) -> MomentumSGD {
+	pub fn with_mu(model:&NNModel,a:f64,mu:f64) -> MomentumSGD {
 		MomentumSGD {
 			a:a,
 			mu:mu,
 			lambda:0.0f64,
-			vt:Gradient::new(s)
+			vt:Gradient::new(model)
 		}
 	}
-	pub fn with_params(s:usize,a:f64,mu:f64,lambda:f64) -> MomentumSGD {
+	pub fn with_params(model:&NNModel,a:f64,mu:f64,lambda:f64) -> MomentumSGD {
 		MomentumSGD {
 			a:a,
 			mu:mu,
 			lambda:lambda,
-			vt:Gradient::new(s)
+			vt:Gradient::new(model)
 		}
 	}
 }
 impl Optimizer for MomentumSGD {
-	fn update(&mut self,k:(usize,usize),e:&[f64], win:&Vec<f64>,wout:&mut Vec<f64>) {
-		let vt = self.vt.get(k,win.len());
+	fn update(&mut self,l:usize,u:usize,e:&[f64], win:&Vec<f64>,wout:&mut Vec<f64>) {
+		let vt = self.vt.get(l,u);
 
 		let a = self.a;
 		let mu = self.mu;
@@ -100,18 +108,18 @@ pub struct Adagrad {
 	gt:Gradient,
 }
 impl Adagrad {
-	pub fn new(s:usize) -> Adagrad {
+	pub fn new(model:&NNModel) -> Adagrad {
 		Adagrad {
 			a:0.01f64,
-			gt:Gradient::new(s)
+			gt:Gradient::new(model)
 		}
 	}
 }
 impl Optimizer for Adagrad {
-	fn update(&mut self,k:(usize,usize),e:&[f64], win:&Vec<f64>,wout:&mut Vec<f64>) {
+	fn update(&mut self,l:usize,u:usize,e:&[f64], win:&Vec<f64>,wout:&mut Vec<f64>) {
 		const EPS:f64 = 1e-8f64;
 
-		let gt = self.gt.get(k,win.len());
+		let gt = self.gt.get(l,u);
 
 		let a = self.a;
 
@@ -127,19 +135,19 @@ pub struct RMSprop {
 	gt:Gradient,
 }
 impl RMSprop {
-	pub fn new(s:usize)-> RMSprop {
+	pub fn new(model:&NNModel)-> RMSprop {
 		RMSprop {
 			a:0.0001f64,
 			mu:0.9f64,
-			gt:Gradient::new(s),
+			gt:Gradient::new(model),
 		}
 	}
 }
 impl Optimizer for RMSprop {
-	fn update(&mut self,k:(usize,usize),e:&[f64], win:&Vec<f64>,wout:&mut Vec<f64>) {
+	fn update(&mut self,l:usize,u:usize,e:&[f64], win:&Vec<f64>,wout:&mut Vec<f64>) {
 		const EPS:f64 = 1e-8f64;
 
-		let gt = self.gt.get(k,win.len());
+		let gt = self.gt.get(l,u);
 
 		let a = self.a;
 		let mu = self.mu;
@@ -160,11 +168,11 @@ pub struct Adam {
 	b2t:f64,
 }
 impl Adam {
-	pub fn new(s:usize) -> Adam {
+	pub fn new(model:&NNModel) -> Adam {
 		Adam {
 			a:0.001f64,
-			mt:Gradient::new(s),
-			vt:Gradient::new(s),
+			mt:Gradient::new(model),
+			vt:Gradient::new(model),
 			b1:0.9f64,
 			b2:0.999f64,
 			b1t:0.9f64,
@@ -173,11 +181,11 @@ impl Adam {
 	}
 }
 impl Optimizer for Adam {
-	fn update(&mut self,k:(usize,usize),e:&[f64], win:&Vec<f64>,wout:&mut Vec<f64>) {
+	fn update(&mut self,l:usize,u:usize,e:&[f64], win:&Vec<f64>,wout:&mut Vec<f64>) {
 		const EPS:f64 = 1e-8f64;
 
-		let mt = self.mt.get(k,win.len());
-		let vt = self.vt.get(k,win.len());
+		let mt = self.mt.get(l,u);
+		let vt = self.vt.get(l,u);
 
 		let a = self.a;
 		let b1 = self.b1;

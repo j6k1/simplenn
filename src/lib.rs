@@ -32,15 +32,13 @@ pub struct NN<O,E> where O: Optimizer, E: LossFunction {
 
 impl<O,E> NN<O,E> where O: Optimizer, E: LossFunction {
 	pub fn new<F>(model:NNModel,optimizer_creator:F,lossf:E) -> NN<O,E>
-		where F: Fn(usize) -> O {
-		let mut size = 0;
+		where F: Fn(&NNModel) -> O {
 
-		for i in 0..model.units.len() - 1 {
-			size += model.units[i].0 + 1;
-		}
+		let optimizer = optimizer_creator(&model);
+
 		NN {
 			model:Arc::new(model),
-			optimizer:optimizer_creator(size),
+			optimizer:optimizer,
 			lossf:Arc::new(lossf),
 		}
 	}
@@ -508,7 +506,7 @@ impl NNModel {
 			for j in 1..self.units[l].0 + 1 {
 				e[j-1] = d[j] * o;
 			}
-			optimizer.update((hl,i),&e,&self.layers[hl][i],&mut layers[hl][i]);
+			optimizer.update(hl,i,&e,&self.layers[hl][i],&mut layers[hl][i]);
 		}
 
 		for l in (1..self.units.len()-1).rev() {
@@ -544,7 +542,7 @@ impl NNModel {
 				for j in 1..self.units[l].0 + 1 {
 					e[j-1] = nd[j] * o;
 				}
-				optimizer.update((hl,i),&e,&self.layers[hl][i],&mut layers[hl][i]);
+				optimizer.update(hl,i,&e,&self.layers[hl][i],&mut layers[hl][i]);
 			}
 
 			d = nd;
@@ -692,7 +690,7 @@ impl NNModel {
 
 		for l in (0..self.layers.len()).rev() {
 			for i in 0..self.layers[l].len() {
-				optimizer.update((l,i),&de_dw_total[l][i].iter()
+				optimizer.update(l,i,&de_dw_total[l][i].iter()
 																.map(|e| e / batch_size as f64)
 																.collect::<Vec<f64>>(),
 								 							&self.layers[l][i],&mut layers[l][i]);
@@ -911,7 +909,7 @@ impl NNModel {
 
 		for l in (0..self.layers.len()).rev() {
 			for i in 0..self.layers[l].len() {
-				optimizer.update((l,i),&de_dw_total[l][i].iter()
+				optimizer.update(l,i,&de_dw_total[l][i].iter()
 					.map(|e| e / batch_size as f64)
 					.collect::<Vec<f64>>(),
 								 &self.layers[l][i],&mut layers[l][i]);
