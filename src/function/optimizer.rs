@@ -49,6 +49,52 @@ impl Optimizer for SGD {
 		}
 	}
 }
+pub struct MomentumSGD {
+	a:f64,
+	mu:f64,
+	lambda:f64,
+	vt:Gradient
+}
+impl MomentumSGD {
+	pub fn new(s:usize,a:f64) -> MomentumSGD {
+		MomentumSGD {
+			a:a,
+			mu:0.9,
+			lambda:0.0f64,
+			vt:Gradient::new(s)
+		}
+	}
+	pub fn with_mu(s:usize,a:f64,mu:f64) -> MomentumSGD {
+		MomentumSGD {
+			a:a,
+			mu:mu,
+			lambda:0.0f64,
+			vt:Gradient::new(s)
+		}
+	}
+	pub fn with_params(s:usize,a:f64,mu:f64,lambda:f64) -> MomentumSGD {
+		MomentumSGD {
+			a:a,
+			mu:mu,
+			lambda:lambda,
+			vt:Gradient::new(s)
+		}
+	}
+}
+impl Optimizer for MomentumSGD {
+	fn update(&mut self,k:(usize,usize),e:&[f64], win:&Vec<f64>,wout:&mut Vec<f64>) {
+		let vt = self.vt.get(k,win.len());
+
+		let a = self.a;
+		let mu = self.mu;
+
+		let lambda = self.lambda;
+		for ((w,wi),(vi,ei)) in wout.iter_mut().zip(win).zip(vt.iter_mut().zip(e)) {
+			*vi = *vi * mu - (1f64 - mu) * a * (ei + lambda * *wi);
+			*w = *wi + *vi;
+		}
+	}
+}
 pub struct Adagrad {
 	a:f64,
 	gt:Gradient,
