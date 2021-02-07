@@ -21,7 +21,7 @@ impl LossFunction for Mse {
 	}
 
 	fn derive(&self,r:f64,t:f64) -> f64 {
-		r- t
+		r - t
 	}
 
 	fn is_canonical_link(&self,f:&Box<dyn ActivateF>) -> bool {
