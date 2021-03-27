@@ -112,7 +112,7 @@ impl<O,E> NN<O,E> where O: Optimizer, E: LossFunction {
 	}
 
 	pub fn learn_batch_parallel<I>(&mut self,threads:usize,it:I) -> Result<Metrics,InvalidStateError>
-		where I: Iterator<Item = (Vec<f64>,Vec<f64>)> {
+		where I: ExactSizeIterator<Item = (Vec<f64>,Vec<f64>)> {
 
 		self.model.learn_batch_parallel(threads,it,&mut self.optimizer,self.lossf.clone())
 	}
@@ -707,11 +707,9 @@ impl NNModel {
 	fn learn_batch_parallel<O,E,I>(self:&mut Arc<Self>,threads:usize,it:I,optimizer:&mut O,lossf:Arc<E>) -> Result<Metrics,InvalidStateError>
 		where O: Optimizer,
 			  E: LossFunction,
-			  I: Iterator<Item = (Vec<f64>,Vec<f64>)>,
+			  I: ExactSizeIterator<Item = (Vec<f64>,Vec<f64>)>,
 			  NNModel: Send + Sync + 'static {
-		let samples = it.collect::<Vec<(Vec<f64>,Vec<f64>)>>();
-
-		let batch_size = samples.len();
+		let batch_size = it.len();
 
 		let chunk_width = std::cmp::max(1,batch_size / threads);
 
@@ -734,7 +732,7 @@ impl NNModel {
 			error_average:0f64
 		};
 
-		let mut it = samples.into_iter();
+		let mut it = it;
 		let (sender,receiver):(_,Receiver<Result<(Vec<Vec<Vec<f64>>>,Metrics),InvalidStateError>>) = mpsc::channel();
 		let mut busy_threads = 0;
 		let mut has_remaining = true;
