@@ -64,7 +64,7 @@ pub trait Pow {
 pub trait Exp {
     fn exp(&self) -> Self;
 }
-pub trait Tanh: Exp {
+pub trait Tanh {
     fn tanh(&self) -> Self;
 }
 impl IntegerPartOne for f64 {
