@@ -7,7 +7,7 @@ pub struct Gradient {
 	g:Vec<Vec<Vec<f64>>>
 }
 impl Gradient {
-	pub fn new(model:&NNModel) -> Gradient {
+	pub fn new(model:&NNModel<f64>) -> Gradient {
 		let mut g = Vec::with_capacity(model.layers.len());
 
 		for layer in &model.layers {
@@ -64,7 +64,7 @@ pub struct MomentumSGD {
 	vt:Gradient
 }
 impl MomentumSGD {
-	pub fn new(model:&NNModel,a:f64) -> MomentumSGD {
+	pub fn new(model:&NNModel<f64>,a:f64) -> MomentumSGD {
 		MomentumSGD {
 			a:a,
 			mu:0.9,
@@ -72,7 +72,7 @@ impl MomentumSGD {
 			vt:Gradient::new(model)
 		}
 	}
-	pub fn with_mu(model:&NNModel,a:f64,mu:f64) -> MomentumSGD {
+	pub fn with_mu(model:&NNModel<f64>,a:f64,mu:f64) -> MomentumSGD {
 		MomentumSGD {
 			a:a,
 			mu:mu,
@@ -80,7 +80,7 @@ impl MomentumSGD {
 			vt:Gradient::new(model)
 		}
 	}
-	pub fn with_params(model:&NNModel,a:f64,mu:f64,lambda:f64) -> MomentumSGD {
+	pub fn with_params(model:&NNModel<f64>,a:f64,mu:f64,lambda:f64) -> MomentumSGD {
 		MomentumSGD {
 			a:a,
 			mu:mu,
@@ -108,7 +108,7 @@ pub struct Adagrad {
 	gt:Gradient,
 }
 impl Adagrad {
-	pub fn new(model:&NNModel) -> Adagrad {
+	pub fn new(model:&NNModel<f64>) -> Adagrad {
 		Adagrad {
 			a:0.01f64,
 			gt:Gradient::new(model)
@@ -135,7 +135,7 @@ pub struct RMSprop {
 	gt:Gradient,
 }
 impl RMSprop {
-	pub fn new(model:&NNModel)-> RMSprop {
+	pub fn new(model:&NNModel<f64>)-> RMSprop {
 		RMSprop {
 			a:0.0001f64,
 			mu:0.9f64,
@@ -168,7 +168,7 @@ pub struct Adam {
 	b2t:f64,
 }
 impl Adam {
-	pub fn new(model:&NNModel) -> Adam {
+	pub fn new(model:&NNModel<f64>) -> Adam {
 		Adam {
 			a:0.001f64,
 			mt:Gradient::new(model),

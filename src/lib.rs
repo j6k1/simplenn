@@ -18,21 +18,49 @@ use function::activation::*;
 use function::loss::*;
 use function::optimizer::*;
 use std::sync::mpsc::Receiver;
+use std::ops::{AddAssign, Add, Mul, Sub, Div, Neg};
+use function::{Exp, Tanh, IntegerPartOne, InitialMax, Max};
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Metrics {
 	pub error_total:f64,
 	pub error_average:f64
 }
-pub struct NN<O,E> where O: Optimizer, E: LossFunction {
-	model:Arc<NNModel>,
+pub trait Bias where Self: Sized {
+	fn bias() -> Self;
+}
+impl Bias for f64 {
+	#[inline]
+	fn bias() -> f64 {
+		1f64
+	}
+}
+impl Bias for u8 {
+	#[inline]
+	fn bias() -> u8 {
+		8
+	}
+}
+pub struct NN<T,O,E>
+	where O: Optimizer, E: LossFunction<T>,
+		  T: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
+		     AddAssign + PartialOrd +
+		     Exp + Tanh + InitialMax + IntegerPartOne + Max + Bias +
+		     Default + Clone + Copy + Send + Sync + 'static {
+	model:Arc<NNModel<T>>,
 	optimizer:O,
 	lossf:Arc<E>,
 }
 
-impl<O,E> NN<O,E> where O: Optimizer, E: LossFunction {
-	pub fn new<F>(model:NNModel,optimizer_creator:F,lossf:E) -> NN<O,E>
-		where F: Fn(&NNModel) -> O {
+impl<T,O,E> NN<T,O,E>
+	where O: Optimizer, E: LossFunction<T>,
+		  T: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
+		     AddAssign + PartialOrd +
+		     Exp + Tanh + InitialMax + IntegerPartOne + Max + Bias +
+		     Default + Clone + Copy + Send + Sync + 'static {
+
+	pub fn new<F>(model:NNModel<T>,optimizer_creator:F,lossf:E) -> NN<T,O,E>
+		where F: Fn(&NNModel<T>) -> O {
 
 		let optimizer = optimizer_creator(&model);
 
@@ -43,9 +71,27 @@ impl<O,E> NN<O,E> where O: Optimizer, E: LossFunction {
 		}
 	}
 
-	pub fn promise_of_learn(&mut self,input:&[f64]) ->
-		Result<SnapShot,InvalidStateError> {
+	pub fn solve(&self,input:&[T]) ->
+		Result<Vec<T>,InvalidStateError> {
 
+		self.model.solve(input)
+	}
+
+	pub fn solve_shapshot(&self,input:&[T]) ->
+		Result<SnapShot<T>,InvalidStateError> {
+
+		self.model.solve_shapshot(input)
+	}
+
+	pub fn solve_diff(&self,input:&[(usize,T)],snapshot:&SnapShot<T>) ->
+		Result<SnapShot<T>,InvalidStateError> {
+
+		self.model.solve_diff(input,snapshot)
+	}
+}
+impl<O,E> NN<f64,O,E> where O: Optimizer, E: LossFunction<f64> {
+	pub fn promise_of_learn(&mut self, input: &[f64]) ->
+	Result<SnapShot<f64>, InvalidStateError> {
 		match Arc::get_mut(&mut self.model) {
 			Some(ref mut model) => model.promise_of_learn(input),
 			None => {
@@ -54,26 +100,8 @@ impl<O,E> NN<O,E> where O: Optimizer, E: LossFunction {
 		}
 	}
 
-	pub fn solve(&self,input:&[f64]) ->
-		Result<Vec<f64>,InvalidStateError> {
-
-		self.model.solve(input)
-	}
-
-	pub fn solve_shapshot(&self,input:&[f64]) ->
-		Result<SnapShot,InvalidStateError> {
-
-		self.model.solve_shapshot(input)
-	}
-
-	pub fn solve_diff(&self,input:&[(usize,f64)],snapshot:&SnapShot) ->
-		Result<SnapShot,InvalidStateError> {
-
-		self.model.solve_diff(input,snapshot)
-	}
-
 	pub fn learn(&mut self,input:&[f64],t:&[f64]) -> Result<Metrics,InvalidStateError>
-		where O: Optimizer, E: LossFunction {
+		where O: Optimizer, E: LossFunction<f64> {
 
 		match Arc::get_mut(&mut self.model) {
 			Some(ref mut model) => {
@@ -85,8 +113,8 @@ impl<O,E> NN<O,E> where O: Optimizer, E: LossFunction {
 		}
 	}
 
-	pub fn latter_part_of_learning(&mut self, t:&[f64],s:&SnapShot) ->
-		Result<Metrics,InvalidStateError> {
+	pub fn latter_part_of_learning(&mut self, t:&[f64],s:&SnapShot<f64>) ->
+	Result<Metrics,InvalidStateError> {
 
 		match Arc::get_mut(&mut self.model) {
 			Some(ref mut model) => {
@@ -124,13 +152,18 @@ impl<O,E> NN<O,E> where O: Optimizer, E: LossFunction {
 		Ok(())
 	}
 }
-pub struct NNUnits {
+pub struct NNUnits<T> {
 	input_units:usize,
-	defs:Vec<(usize,Box<dyn ActivateF>)>,
+	defs:Vec<(usize,Box<dyn ActivateF<T>>)>,
 }
-impl NNUnits {
-	pub fn new(input_units:usize, l1:(usize,Box<dyn ActivateF>),l2:(usize,Box<dyn ActivateF>)) -> NNUnits {
-		let mut defs:Vec<(usize,Box<dyn ActivateF>)> = Vec::new();
+impl<T> NNUnits<T>
+	where T: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
+			 AddAssign + PartialOrd +
+			 Exp + Tanh + InitialMax + IntegerPartOne + Max + Bias +
+			 Default + Clone + Copy + Send + Sync + 'static {
+
+	pub fn new(input_units:usize, l1:(usize,Box<dyn ActivateF<T>>),l2:(usize,Box<dyn ActivateF<T>>)) -> NNUnits<T> {
+		let mut defs:Vec<(usize,Box<dyn ActivateF<T>>)> = Vec::new();
 		defs.push(l1);
 		defs.push(l2);
 		NNUnits {
@@ -139,23 +172,27 @@ impl NNUnits {
 		}
 	}
 
-	pub fn add(mut self, units:(usize,Box<dyn ActivateF>)) -> NNUnits {
+	pub fn add(mut self, units:(usize,Box<dyn ActivateF<T>>)) -> NNUnits<T> {
 		self.defs.push(units);
 		self
 	}
 }
-pub struct NNModel {
-	units:Vec<(usize,Option<Box<dyn ActivateF>>)>,
-	layers:Vec<Vec<Vec<f64>>>,
+pub struct NNModel<T>
+	where T: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
+		  AddAssign + PartialOrd +
+		  Exp + Tanh + InitialMax + IntegerPartOne + Max + Bias +
+		  Default + Clone + Copy + Send + Sync + 'static {
+	units:Vec<(usize,Option<Box<dyn ActivateF<T>>>)>,
+	layers:Vec<Vec<Vec<T>>>,
 	hash:u64,
 }
-impl NNModel {
-	pub fn load<I,E>(mut reader:I) -> Result<NNModel, E>
+impl NNModel<f64> {
+	pub fn load<I,E>(mut reader:I) -> Result<NNModel<f64>, E>
 		where I: ModelInputReader<E>, E: Error, StartupError<E>: From<E> {
 		reader.read_model()
 	}
 
-	pub fn new<E>(units:Vec<(usize,Option<Box<dyn ActivateF>>)>,layers:Vec<Vec<Vec<f64>>>) -> Result<NNModel,StartupError<E>>
+	pub fn new<E>(units:Vec<(usize,Option<Box<dyn ActivateF<f64>>>)>,layers:Vec<Vec<Vec<f64>>>) -> Result<NNModel<f64>,StartupError<E>>
 		where E: Error + fmt::Debug, StartupError<E>: From<E> {
 
 		let mut rnd = rand::thread_rng();
@@ -194,10 +231,10 @@ impl NNModel {
 		})
 	}
 
-	pub fn with_unit_initializer<I,F,E>(units:NNUnits,
+	pub fn with_unit_initializer<I,F,E>(units:NNUnits<f64>,
 												reader:I,
 												mut initializer:F) ->
-		Result<NNModel,StartupError<E>>
+		Result<NNModel<f64>,StartupError<E>>
 		where I: InputReader<E>, F: FnMut() -> f64, E: Error + fmt::Debug, StartupError<E>: From<E> {
 
 		let iunits = units.input_units;
@@ -226,11 +263,11 @@ impl NNModel {
 		})
 	}
 
-	pub fn with_bias_and_unit_initializer<I,F,B,E>(units:NNUnits,
+	pub fn with_bias_and_unit_initializer<I,F,B,E>(units:NNUnits<f64>,
 												reader:I,
 												mut bias_initializer:B,
 												mut initializer:F) ->
-		Result<NNModel,StartupError<E>>
+		Result<NNModel<f64>,StartupError<E>>
 		where I: InputReader<E>, F: FnMut() -> f64,
 				B: FnMut() -> f64, E: Error + fmt::Debug, StartupError<E>: From<E> {
 
@@ -268,13 +305,13 @@ impl NNModel {
 		})
 	}
 
-	pub fn with_schema<I,F,E>(units:NNUnits,mut reader:I,mut initializer:F) ->
-		Result<NNModel,StartupError<E>>
+	pub fn with_schema<I,F,E>(units:NNUnits<f64>,mut reader:I,mut initializer:F) ->
+		Result<NNModel<f64>,StartupError<E>>
 		where I: InputReader<E>, F: FnMut() -> Vec<Vec<Vec<f64>>>, E: Error + fmt::Debug, StartupError<E>: From<E> {
 
 		let iunits = units.input_units;
 
-		let mut units:Vec<(usize,Option<Box<dyn ActivateF>>)> = units
+		let mut units:Vec<(usize,Option<Box<dyn ActivateF<f64>>>)> = units
 															.defs
 															.into_iter()
 															.map(|(u,f)| (u, Some(f)))
@@ -311,135 +348,8 @@ impl NNModel {
 		)
 	}
 
-	pub fn apply<F,R>(&self,input:&[f64],after_callback:F) -> Result<R,InvalidStateError>
-		where F: Fn(Vec<f64>,Vec<Vec<f64>>,Vec<Vec<f64>>) -> Result<R,InvalidStateError> {
-		if input.len() != self.units[0].0 {
-			return Err(InvalidStateError::InvalidInput(String::from(
-				"The inputs to the input layer is invalid (the count of inputs must be the count of units)")));
-		}
-
-		let mut o:Vec<Vec<f64>> = Vec::with_capacity(self.units.len());
-		let mut u:Vec<Vec<f64>> = Vec::with_capacity(self.units.len());
-
-		u.push(Vec::new());
-
-		let mut oi:Vec<f64> = Vec::with_capacity(self.units[0].0 + 1);
-
-		oi.push(1f64);
-
-		for i in input {
-			oi.push(*i);
-		}
-
-		o.push(oi);
-
-		u.push(Vec::with_capacity(self.units[1].0 + 1));
-
-		u[1].resize(self.units[1].0 + 1, 0f64);
-
-		for (o,wl) in o[0].iter().zip(&self.layers[0]) {
-			for (u,w) in u[1].iter_mut().skip(1).zip(wl) {
-				*u += o * w;
-			}
-		}
-
-		self.apply_middle_and_out(o,u,after_callback)
-	}
-
-	pub fn apply_diff<F,R>(&self,input:&[(usize,f64)],s:&SnapShot,after_callback:F) -> Result<R,InvalidStateError>
-		where F: Fn(Vec<f64>,Vec<Vec<f64>>,Vec<Vec<f64>>) -> Result<R,InvalidStateError> {
-		let mut o:Vec<Vec<f64>> = Vec::with_capacity(self.units.len());
-		let mut u:Vec<Vec<f64>> = Vec::with_capacity(self.units.len());
-
-		u.push(s.u[0].clone());
-
-		let mut oi:Vec<f64> = s.o[0].clone();
-
-		for &(i,d) in input {
-			// インデックス0はバイアスのユニットなので一つ右にずらす
-			oi[i+1] += d;
-		}
-
-		o.push(oi);
-
-		let mut ui = s.u[1].clone();
-
-		for &(i,d) in input {
-			// インデックス0はバイアスのユニットなので一つ右にずらす
-			for (u,w) in ui.iter_mut().skip(1).zip(&self.layers[0][i+1]) {
-				*u += d * w;
-			}
-		}
-
-		u.push(ui);
-
-		self.apply_middle_and_out(o,u,after_callback)
-	}
-
-	fn apply_middle_and_out<F,R>(&self,mut o:Vec<Vec<f64>>,mut u:Vec<Vec<f64>>,after_callback:F) -> Result<R,InvalidStateError>
-		where F: Fn(Vec<f64>,Vec<Vec<f64>>,Vec<Vec<f64>>) -> Result<R,InvalidStateError> {
-		o.push(Vec::with_capacity(self.units[1].0 + 1));
-		o[1].resize(self.units[1].0 + 1, 0f64);
-
-		let f:&Box<dyn ActivateF> = match self.units[1].1 {
-			Some(ref f) => f,
-			None => {
-				return Err(InvalidStateError::InvalidInput(String::from(
-							"Reference to the activation function object is not set."
-						)));
-			}
-		};
-
-		o[1][0] = 1f64;
-
-		for (oi,&ui) in o[1].iter_mut().zip(u[1].iter()) {
-			*oi = f.apply(ui,&u[1]);
-		}
-
-		for l in 1..self.units.len() - 1 {
-			let ll = l + 1;
-			let mut ul:Vec<f64> = Vec::with_capacity(self.units[ll].0 + 1);
-			ul.resize(self.units[ll].0 + 1, 0f64);
-			u.push(ul);
-			let f:&Box<dyn ActivateF> = match self.units[ll].1 {
-				Some(ref f) => f,
-				None => {
-					return Err(InvalidStateError::InvalidInput(String::from(
-								"Reference to the activation function object is not set."
-							)));
-				}
-			};
-
-			let mut ol:Vec<f64> = Vec::with_capacity(self.units[ll].0 + 1);
-			ol.resize(self.units[ll].0 + 1, 0f64);
-			o.push(ol);
-
-			o[ll][0] = 1f64;
-
-			for (o,wl) in o[l].iter().zip(&self.layers[l]) {
-				for (u,w) in u[ll].iter_mut().skip(1).zip(wl) {
-					*u = *u + o * w;
-				}
-			}
-
-			let u = &u[ll];
-
-			for (o,ui) in o[ll].iter_mut().skip(1).zip(u.iter().skip(1)) {
-				*o = f.apply(*ui,u);
-			}
-		}
-
-		let mut r:Vec<f64> = Vec::with_capacity(self.units[self.units.len()-1].0);
-
-		for &oi in o[self.units.len()-1].iter().skip(1) {
-			r.push(oi);
-		}
-
-		after_callback(r,o,u)
-	}
-
-	fn latter_part_of_learning<O,E>(&mut self, t:&[f64],s:&SnapShot,optimizer:&mut O,lossf:&E) ->
-		Result<Metrics,InvalidStateError> where O: Optimizer, E: LossFunction {
+	fn latter_part_of_learning<O,E>(&mut self, t:&[f64],s:&SnapShot<f64>,optimizer:&mut O,lossf:&E) ->
+		Result<Metrics,InvalidStateError> where O: Optimizer, E: LossFunction<f64> {
 
 		if s.hash.map(|h| h != self.hash).unwrap_or(false) {
 			return Err(InvalidStateError::GenerationError(String::from(
@@ -469,7 +379,7 @@ impl NNModel {
 			layers.push(layer);
 		}
 
-		let f:&Box<dyn ActivateF> = match self.units[self.units.len()-1].1 {
+		let f:&Box<dyn ActivateF<f64>> = match self.units[self.units.len()-1].1 {
 			Some(ref f) => f,
 			None => {
 				return Err(InvalidStateError::InvalidInput(String::from(
@@ -512,7 +422,7 @@ impl NNModel {
 		for l in (1..self.units.len()-1).rev() {
 			let hl = l - 1;
 			let ll = l + 1;
-			let f:&Box<dyn ActivateF> = match self.units[l].1 {
+			let f:&Box<dyn ActivateF<f64>> = match self.units[l].1 {
 				Some(ref f) => f,
 				None => {
 					return Err(InvalidStateError::InvalidInput(String::from(
@@ -555,18 +465,8 @@ impl NNModel {
 		Ok(metrics)
 	}
 
-	fn solve(&self,input:&[f64]) ->
-		Result<Vec<f64>,InvalidStateError> {
-
-		self.apply(input,|r,_,_| Ok(r))
-	}
-
-	fn solve_diff(&self,input:&[(usize,f64)],s:&SnapShot) -> Result<SnapShot,InvalidStateError> {
-		self.apply_diff(input,s,|r,o,u| Ok(SnapShot::new(r,o,u,None)))
-	}
-
 	fn learn<O,E>(&mut self,input:&[f64],t:&[f64],optimizer:&mut O,lossf:&E) -> Result<Metrics,InvalidStateError>
-		where O: Optimizer, E: LossFunction {
+		where O: Optimizer, E: LossFunction<f64> {
 
 		let s = self.promise_of_learn(input)?;
 
@@ -574,7 +474,7 @@ impl NNModel {
 	}
 
 	fn learn_batch<O,E,I>(&mut self,it:I,optimizer:&mut O,lossf:&E) -> Result<Metrics,InvalidStateError>
-		where O: Optimizer, E: LossFunction, I: Iterator<Item = (Vec<f64>,Vec<f64>)> {
+		where O: Optimizer, E: LossFunction<f64>, I: Iterator<Item = (Vec<f64>,Vec<f64>)> {
 
 		let mut batch_size = 0;
 		let mut de_dw_total:Vec<Vec<Vec<f64>>> = Vec::with_capacity(self.layers.len());
@@ -608,7 +508,7 @@ impl NNModel {
 			let mut d:Vec<f64> = Vec::with_capacity(self.units[self.units.len()-1].0 + 1);
 			d.resize(self.units[self.units.len()-1].0 + 1, 0f64);
 
-			let f:&Box<dyn ActivateF> = match self.units[self.units.len()-1].1 {
+			let f:&Box<dyn ActivateF<f64>> = match self.units[self.units.len()-1].1 {
 				Some(ref f) => f,
 				None => {
 					return Err(InvalidStateError::InvalidInput(String::from(
@@ -642,7 +542,7 @@ impl NNModel {
 			for l in (1..self.units.len()-1).rev() {
 				let hl = l - 1;
 				let ll = l + 1;
-				let f:&Box<dyn ActivateF> = match self.units[l].1 {
+				let f:&Box<dyn ActivateF<f64>> = match self.units[l].1 {
 					Some(ref f) => f,
 					None => {
 						return Err(InvalidStateError::InvalidInput(String::from(
@@ -706,9 +606,9 @@ impl NNModel {
 
 	fn learn_batch_parallel<O,E,I>(self:&mut Arc<Self>,threads:usize,it:I,optimizer:&mut O,lossf:Arc<E>) -> Result<Metrics,InvalidStateError>
 		where O: Optimizer,
-			  E: LossFunction,
+			  E: LossFunction<f64>,
 			  I: ExactSizeIterator<Item = (Vec<f64>,Vec<f64>)>,
-			  NNModel: Send + Sync + 'static {
+			  NNModel<f64>: Send + Sync + 'static {
 		let batch_size = it.len();
 
 		let chunk_width = std::cmp::max(1,batch_size / threads);
@@ -816,7 +716,7 @@ impl NNModel {
 							let mut d: Vec<f64> = Vec::with_capacity(this.units[this.units.len() - 1].0 + 1);
 							d.resize(this.units[this.units.len() - 1].0 + 1, 0f64);
 
-							let f: &Box<dyn ActivateF> = match this.units[this.units.len() - 1].1 {
+							let f: &Box<dyn ActivateF<f64>> = match this.units[this.units.len() - 1].1 {
 								Some(ref f) => f,
 								None => {
 									return Err(InvalidStateError::InvalidInput(String::from(
@@ -850,7 +750,7 @@ impl NNModel {
 							for l in (1..this.units.len() - 1).rev() {
 								let hl = l - 1;
 								let ll = l + 1;
-								let f: &Box<dyn ActivateF> = match this.units[l].1 {
+								let f: &Box<dyn ActivateF<f64>> = match this.units[l].1 {
 									Some(ref f) => f,
 									None => {
 										return Err(InvalidStateError::InvalidInput(String::from(
@@ -925,13 +825,8 @@ impl NNModel {
 		}
 	}
 
-	fn solve_shapshot(&self,input:&[f64]) ->
-		Result<SnapShot,InvalidStateError> {
-		self.apply(input,|r,o,u| Ok(SnapShot::new(r,o,u,None)))
-	}
-
 	fn promise_of_learn(&mut self,input:&[f64]) ->
-		Result<SnapShot,InvalidStateError> {
+		Result<SnapShot<f64>,InvalidStateError> {
 
 		let mut rnd = rand::thread_rng();
 		let mut rnd = XorShiftRng::from_seed(rnd.gen());
@@ -940,14 +835,159 @@ impl NNModel {
 		self.apply(input,|r,o,u| Ok(SnapShot::new(r,o,u,Some(self.hash))))
 	}
 }
-pub struct SnapShot {
-	pub r:Vec<f64>,
-	o:Vec<Vec<f64>>,
-	u:Vec<Vec<f64>>,
+impl<T> NNModel<T>
+	where T: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
+			 AddAssign + PartialOrd +
+			 Exp + Tanh + InitialMax + IntegerPartOne + Max + Bias +
+			 Default + Clone + Copy + Send + Sync + 'static {
+	fn solve(&self,input:&[T]) -> Result<Vec<T>,InvalidStateError> {
+
+		self.apply(input,|r,_,_| Ok(r))
+	}
+
+	fn solve_diff(&self,input:&[(usize,T)],s:&SnapShot<T>) -> Result<SnapShot<T>,InvalidStateError> {
+		self.apply_diff(input,s,|r,o,u| Ok(SnapShot::new(r,o,u,None)))
+	}
+
+	fn solve_shapshot(&self,input:&[T]) -> Result<SnapShot<T>,InvalidStateError> {
+		self.apply(input,|r,o,u| Ok(SnapShot::new(r,o,u,None)))
+	}
+
+	pub fn apply<F,R>(&self,input:&[T],after_callback:F) -> Result<R,InvalidStateError>
+		where F: Fn(Vec<T>,Vec<Vec<T>>,Vec<Vec<T>>) -> Result<R,InvalidStateError> {
+		if input.len() != self.units[0].0 {
+			return Err(InvalidStateError::InvalidInput(String::from(
+				"The inputs to the input layer is invalid (the count of inputs must be the count of units)")));
+		}
+
+		let mut o:Vec<Vec<T>> = Vec::with_capacity(self.units.len());
+		let mut u:Vec<Vec<T>> = Vec::with_capacity(self.units.len());
+
+		u.push(Vec::new());
+
+		let mut oi:Vec<T> = Vec::with_capacity(self.units[0].0 + 1);
+
+		oi.push(T::bias());
+
+		for i in input {
+			oi.push(*i);
+		}
+
+		o.push(oi);
+
+		u.push(Vec::with_capacity(self.units[1].0 + 1));
+
+		u[1].resize_with(self.units[1].0 + 1, Default::default);
+
+		for (&o,wl) in o[0].iter().zip(&self.layers[0]) {
+			for (u,&w) in u[1].iter_mut().skip(1).zip(wl) {
+				*u += o * w;
+			}
+		}
+
+		self.apply_middle_and_out(o,u,after_callback)
+	}
+
+	pub fn apply_diff<F,R>(&self,input:&[(usize,T)],s:&SnapShot<T>,after_callback:F) -> Result<R,InvalidStateError>
+		where F: Fn(Vec<T>,Vec<Vec<T>>,Vec<Vec<T>>) -> Result<R,InvalidStateError> {
+		let mut o:Vec<Vec<T>> = Vec::with_capacity(self.units.len());
+		let mut u:Vec<Vec<T>> = Vec::with_capacity(self.units.len());
+
+		u.push(s.u[0].clone());
+
+		let mut oi:Vec<T> = s.o[0].clone();
+
+		for &(i,d) in input {
+			// インデックス0はバイアスのユニットなので一つ右にずらす
+			oi[i+1] += d;
+		}
+
+		o.push(oi);
+
+		let mut ui = s.u[1].clone();
+
+		for &(i,d) in input {
+			// インデックス0はバイアスのユニットなので一つ右にずらす
+			for (u,&w) in ui.iter_mut().skip(1).zip(&self.layers[0][i+1]) {
+				*u += d * w;
+			}
+		}
+
+		u.push(ui);
+
+		self.apply_middle_and_out(o,u,after_callback)
+	}
+
+	fn apply_middle_and_out<F,R>(&self,mut o:Vec<Vec<T>>,mut u:Vec<Vec<T>>,after_callback:F) -> Result<R,InvalidStateError>
+		where F: Fn(Vec<T>,Vec<Vec<T>>,Vec<Vec<T>>) -> Result<R,InvalidStateError> {
+		o.push(Vec::with_capacity(self.units[1].0 + 1));
+		o[1].resize_with(self.units[1].0 + 1, Default::default);
+
+		let f:&Box<dyn ActivateF<T>> = match self.units[1].1 {
+			Some(ref f) => f,
+			None => {
+				return Err(InvalidStateError::InvalidInput(String::from(
+					"Reference to the activation function object is not set."
+				)));
+			}
+		};
+
+		o[1][0] = T::bias();
+
+		for (oi,&ui) in o[1].iter_mut().zip(u[1].iter()) {
+			*oi = f.apply(ui,&u[1]);
+		}
+
+		for l in 1..self.units.len() - 1 {
+			let ll = l + 1;
+			let mut ul:Vec<T> = Vec::with_capacity(self.units[ll].0 + 1);
+			ul.resize_with(self.units[ll].0 + 1, Default::default);
+			u.push(ul);
+			let f:&Box<dyn ActivateF<T>> = match self.units[ll].1 {
+				Some(ref f) => f,
+				None => {
+					return Err(InvalidStateError::InvalidInput(String::from(
+						"Reference to the activation function object is not set."
+					)));
+				}
+			};
+
+			let mut ol:Vec<T> = Vec::with_capacity(self.units[ll].0 + 1);
+			ol.resize_with(self.units[ll].0 + 1, Default::default);
+			o.push(ol);
+
+			o[ll][0] = T::bias();
+
+			for (&o,wl) in o[l].iter().zip(&self.layers[l]) {
+				for (u,&w) in u[ll].iter_mut().skip(1).zip(wl) {
+					*u = *u + o * w;
+				}
+			}
+
+			let u = &u[ll];
+
+			for (o,ui) in o[ll].iter_mut().skip(1).zip(u.iter().skip(1)) {
+				*o = f.apply(*ui,u);
+			}
+		}
+
+		let mut r:Vec<T> = Vec::with_capacity(self.units[self.units.len()-1].0);
+
+		for &oi in o[self.units.len()-1].iter().skip(1) {
+			r.push(oi);
+		}
+
+		after_callback(r,o,u)
+	}
+}
+pub struct SnapShot<T> {
+	pub r:Vec<T>,
+	o:Vec<Vec<T>>,
+	u:Vec<Vec<T>>,
 	hash:Option<u64>,
 }
-impl SnapShot {
-	pub fn new(r:Vec<f64>,o:Vec<Vec<f64>>,u:Vec<Vec<f64>>,hash:Option<u64>) -> SnapShot {
+impl<T> SnapShot<T> where T: Clone {
+	pub fn new(r:Vec<T>,o:Vec<Vec<T>>,u:Vec<Vec<T>>,hash:Option<u64>) -> SnapShot<T> {
 		SnapShot {
 			r:r,
 			o:o,
@@ -956,7 +996,7 @@ impl SnapShot {
 		}
 	}
 
-	pub fn get_result(&self) -> Vec<f64> {
+	pub fn get_result(&self) -> Vec<T> {
 		self.r.clone()
 	}
 }
@@ -966,7 +1006,7 @@ pub trait InputReader<E> where E: Error + fmt::Debug, StartupError<E>: From<E> {
 	fn verify_eof(&mut self) -> Result<(),E>;
 }
 pub trait ModelInputReader<E> where E: Error + fmt::Debug, StartupError<E>: From<E> {
-	fn read_model<'a>(&mut self) -> Result<NNModel, E>;
+	fn read_model<'a>(&mut self) -> Result<NNModel<f64>, E>;
 }
 pub trait Persistence<E> where E: Error + fmt::Debug, PersistenceError<E>: From<E> {
 	fn save(&mut self,layers:&Vec<Vec<Vec<f64>>>) -> Result<(),E>;

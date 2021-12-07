@@ -1,9 +1,9 @@
 use function::activation::ActivateF;
 
-pub trait LossFunction: Send + Sync + 'static {
+pub trait LossFunction<T>: Send + Sync + 'static {
 	fn apply(&self,r:f64,t:f64) -> f64;
 	fn derive(&self,r:f64,t:f64) -> f64;
-	fn is_canonical_link(&self,_:&Box<dyn ActivateF>) -> bool {
+	fn is_canonical_link(&self,_:&Box<dyn ActivateF<T>>) -> bool {
 		false
 	}
 }
@@ -15,7 +15,7 @@ impl Mse {
 		Mse {}
 	}
 }
-impl LossFunction for Mse {
+impl LossFunction<f64> for Mse {
 	fn apply(&self,r:f64,t:f64) -> f64 {
 		(r - t) * (r - t) / 2f64
 	}
@@ -24,7 +24,7 @@ impl LossFunction for Mse {
 		r - t
 	}
 
-	fn is_canonical_link(&self,f:&Box<dyn ActivateF>) -> bool {
+	fn is_canonical_link(&self,f:&Box<dyn ActivateF<f64>>) -> bool {
 		match f.kind() {
 			"identity" => true,
 			_ => false,
@@ -39,7 +39,7 @@ impl CrossEntropy {
 		CrossEntropy {}
 	}
 }
-impl LossFunction for CrossEntropy {
+impl LossFunction<f64> for CrossEntropy {
 	fn apply(&self,r:f64,t:f64) -> f64 {
 		-t * r.ln() - (1.0f64 - t) * (1.0f64 - r).ln()
 	}
@@ -48,7 +48,7 @@ impl LossFunction for CrossEntropy {
 		(r - t) / (r * (1.0f64 - r))
 	}
 
-	fn is_canonical_link(&self,f:&Box<dyn ActivateF>) -> bool {
+	fn is_canonical_link(&self,f:&Box<dyn ActivateF<f64>>) -> bool {
 		match f.kind() {
 			"sigmoid" => true,
 			_ => false,
@@ -64,7 +64,7 @@ impl CrossEntropyMulticlass {
 
 	}
 }
-impl LossFunction for CrossEntropyMulticlass {
+impl LossFunction<f64> for CrossEntropyMulticlass {
 	fn apply(&self,r:f64,t:f64) -> f64 {
 		-t * r.ln()
 	}
@@ -73,7 +73,7 @@ impl LossFunction for CrossEntropyMulticlass {
 		-t / r
 	}
 
-	fn is_canonical_link(&self,f:&Box<dyn ActivateF>) -> bool {
+	fn is_canonical_link(&self,f:&Box<dyn ActivateF<f64>>) -> bool {
 		match f.kind() {
 			"softmax" => true,
 			_ => false,

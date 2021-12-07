@@ -1,74 +1,99 @@
-pub trait ActivateF: Send + Sync + 'static {
-	fn apply(&self,u:f64,v:&[f64]) -> f64;
-	fn derive(&self,e:f64) -> f64;
+use std::ops::{Add, Sub, Mul, Div, Neg};
+use function::{Exp, IntegerPartOne, Tanh, InitialMax, Max};
+use std::marker::PhantomData;
+
+pub trait ActivateF<T>: Send + Sync + 'static
+	where T: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
+			 PartialOrd + Exp + Tanh + InitialMax + IntegerPartOne + Max +
+			 Default + Clone + Copy + Send + Sync + 'static {
+
+	fn apply(&self,u:T,v:&[T]) -> T;
+	fn derive(&self,e:T) -> T;
 	fn kind(&self) -> &str;
 }
-pub struct FIdentity {
+pub struct FIdentity<T> {
+	t:PhantomData<T>
 }
-impl FIdentity {
-	pub fn new() -> FIdentity {
-		FIdentity {}
+impl<T> FIdentity<T> {
+
+	pub fn new() -> FIdentity<T> {
+		FIdentity {
+			t:PhantomData::<T>
+		}
 	}
 }
-impl ActivateF for FIdentity {
-	fn apply(&self,u:f64,_:&[f64]) -> f64 {
+impl<T> ActivateF<T> for FIdentity<T>
+	where T: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
+			 PartialOrd + Exp + Tanh + InitialMax + IntegerPartOne + Max +
+			 Default + Clone + Copy + Send + Sync + 'static {
+	fn apply(&self,u:T,_:&[T]) -> T {
 		u
 	}
 
-	fn derive(&self,_:f64) -> f64 {
-		1f64
+	fn derive(&self,_:T) -> T {
+		T::integer_part_one()
 	}
 
 	fn kind(&self) -> &str {
 		"identity"
 	}
 }
-pub struct FSigmoid {
-
+pub struct FSigmoid<T> {
+	t:PhantomData::<T>
 }
-impl FSigmoid {
-	pub fn new() -> FSigmoid {
-		FSigmoid {}
+impl<T> FSigmoid<T> {
+	pub fn new() -> FSigmoid<T> {
+		FSigmoid {
+			t:PhantomData::<T>
+		}
 	}
 }
-impl ActivateF for FSigmoid {
-	fn apply(&self,u:f64,_:&[f64]) -> f64 {
-		1.0 / (1.0 + (-u).exp())
+impl<T> ActivateF<T> for FSigmoid<T>
+	where T: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
+			 PartialOrd + Exp + Tanh + InitialMax + IntegerPartOne + Max +
+			 Default + Clone + Copy + Send + Sync + 'static {
+	fn apply(&self,u:T,_:&[T]) -> T {
+		T::integer_part_one() / (T::integer_part_one() + (-u).exp())
 	}
 
-	fn derive(&self,e:f64) -> f64 {
-		let e = 1.0 / (1.0 + (-e).exp());
-		e * (1f64 - e)
+	fn derive(&self,e:T) -> T {
+		let e = T::integer_part_one() / (T::integer_part_one() + (-e).exp());
+		e * (T::integer_part_one() - e)
 	}
 
 	fn kind(&self) -> &str {
 		"sigmoid"
 	}
 }
-pub struct FReLU {
-
+pub struct FReLU<T> {
+	t:PhantomData::<T>
 }
-impl FReLU {
-	pub fn new() -> FReLU {
-		FReLU {}
+impl<T> FReLU<T> {
+	pub fn new() -> FReLU<T> {
+		FReLU {
+			t:PhantomData::<T>
+		}
 	}
 }
-impl ActivateF for FReLU {
-	fn apply(&self,u:f64,_:&[f64]) -> f64 {
+impl<T> ActivateF<T> for FReLU<T>
+	where T: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
+			 PartialOrd + Exp + Tanh + InitialMax + IntegerPartOne + Max +
+			 Default + Clone + Copy + Send + Sync + 'static {
+	fn apply(&self,u:T,_:&[T]) -> T {
 		match u {
-			u if u > 0f64 => {
+			u if u > T::default() => {
 				u
 			},
-			_ => 0f64,
+			_ => T::default(),
 		}
 	}
 
-	fn derive(&self,e:f64) -> f64 {
+	fn derive(&self,e:T) -> T {
 		match e {
-			e if e > 0f64 => {
-				1f64
+			e if e > T::default() => {
+				T::integer_part_one()
 			},
-			_ => 0f64,
+			_ => T::default(),
 		}
 	}
 
@@ -76,44 +101,56 @@ impl ActivateF for FReLU {
 		"relu"
 	}
 }
-pub struct FTanh {
-
+pub struct FTanh<T> {
+	t:PhantomData::<T>
 }
-impl FTanh {
-	pub fn new() -> FTanh {
-		FTanh {}
+impl<T> FTanh<T> {
+	pub fn new() -> FTanh<T> {
+		FTanh {
+			t:PhantomData::<T>
+		}
 	}
 }
-impl ActivateF for FTanh {
-	fn apply(&self,u:f64,_:&[f64]) -> f64 {
+impl<T> ActivateF<T> for FTanh<T>
+	where T: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
+			 PartialOrd + Exp + Tanh + InitialMax + IntegerPartOne + Max +
+			 Default + Clone + Copy + Send + Sync + 'static {
+	fn apply(&self,u:T,_:&[T]) -> T {
 		u.tanh()
 	}
 
-	fn derive(&self,e:f64) -> f64 {
+	fn derive(&self,e:T) -> T {
 		let e = e.tanh();
-		1.0f64 - e * e
+		T::integer_part_one() - e * e
 	}
 
 	fn kind(&self) -> &str {
 		"tanh"
 	}
 }
-pub struct FSoftMax {
+pub struct FSoftMax<T> {
+	t:PhantomData::<T>
 }
-impl FSoftMax {
-	pub fn new() -> FSoftMax {
-		FSoftMax {}
+impl<T> FSoftMax<T> {
+	pub fn new() -> FSoftMax<T> {
+		FSoftMax {
+			t:PhantomData::<T>
+		}
 	}
 }
-impl ActivateF for FSoftMax {
-	fn apply(&self,u:f64,v:&[f64]) -> f64 {
-		let alpha = v.iter().fold(0.0/0.0, |m,v| v.max(m));
+impl<T> ActivateF<T> for FSoftMax<T>
+	where T: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
+			 PartialOrd + Exp + Tanh + InitialMax + IntegerPartOne + Max +
+			 Default + Clone + Copy + Send + Sync + 'static {
+
+	fn apply(&self,u:T,v:&[T]) -> T {
+		let alpha = v.iter().fold(T::initial_max(), |m,&v| v.max(&m));
 		let numer = (u - alpha).exp();
-		numer / v.iter().fold(0.0f64,|acc, &x| acc + (x - alpha).exp())
+		numer / v.iter().fold(T::default(),|acc, &x| acc + (x - alpha).exp())
 	}
 
-	fn derive(&self,e:f64) -> f64 {
-		e * (1.0f64 - e)
+	fn derive(&self,e:T) -> T {
+		e * (T::integer_part_one() - e)
 	}
 
 	fn kind(&self) -> &str {
