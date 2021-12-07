@@ -70,28 +70,29 @@ impl<T,O,E> NN<T,O,E>
 			lossf:Arc::new(lossf),
 		}
 	}
+}
+impl<O,E> NN<f64,O,E> where O: Optimizer, E: LossFunction<f64> {
 
-	pub fn solve(&self,input:&[T]) ->
-		Result<Vec<T>,InvalidStateError> {
+	pub fn solve(&self,input:&[f64]) ->
+		Result<Vec<f64>,InvalidStateError> {
 
 		self.model.solve(input)
 	}
 
-	pub fn solve_shapshot(&self,input:&[T]) ->
-		Result<SnapShot<T>,InvalidStateError> {
+	pub fn solve_shapshot(&self,input:&[f64]) ->
+		Result<SnapShot<f64>,InvalidStateError> {
 
 		self.model.solve_shapshot(input)
 	}
 
-	pub fn solve_diff(&self,input:&[(usize,T)],snapshot:&SnapShot<T>) ->
-		Result<SnapShot<T>,InvalidStateError> {
+	pub fn solve_diff(&self,input:&[(usize,f64)],snapshot:&SnapShot<f64>) ->
+		Result<SnapShot<f64>,InvalidStateError> {
 
 		self.model.solve_diff(input,snapshot)
 	}
-}
-impl<O,E> NN<f64,O,E> where O: Optimizer, E: LossFunction<f64> {
+
 	pub fn promise_of_learn(&mut self, input: &[f64]) ->
-	Result<SnapShot<f64>, InvalidStateError> {
+		Result<SnapShot<f64>, InvalidStateError> {
 		match Arc::get_mut(&mut self.model) {
 			Some(ref mut model) => model.promise_of_learn(input),
 			None => {
@@ -346,6 +347,37 @@ impl NNModel<f64> {
 			units,
 			layers,
 		)
+	}
+
+	fn solve(&self,input:&[f64]) -> Result<Vec<f64>,InvalidStateError> {
+		self.solve_generic(input)
+	}
+
+	fn solve_diff(&self,input:&[(usize,f64)],s:&SnapShot<f64>) -> Result<SnapShot<f64>,InvalidStateError> {
+		self.solve_diff_generic(input,s)
+	}
+
+	fn solve_shapshot(&self,input:&[f64]) -> Result<SnapShot<f64>,InvalidStateError> {
+		self.solve_shapshot_generic(input)
+	}
+
+	pub fn apply<F,R>(&self,input:&[f64],after_callback:F) -> Result<R,InvalidStateError>
+		where F: Fn(Vec<f64>,Vec<Vec<f64>>,Vec<Vec<f64>>) -> Result<R,InvalidStateError> {
+
+		self.apply_gneric(input,after_callback)
+	}
+
+	pub fn apply_diff<F,R>(&self,input:&[(usize,f64)],s:&SnapShot<f64>,after_callback:F) -> Result<R,InvalidStateError>
+		where F: Fn(Vec<f64>,Vec<Vec<f64>>,Vec<Vec<f64>>) -> Result<R,InvalidStateError> {
+
+		self.apply_diff_gneric(input,s,after_callback)
+	}
+
+	#[allow(unused)]
+	fn apply_middle_and_out<F,R>(&self,o:Vec<Vec<f64>>,u:Vec<Vec<f64>>,after_callback:F) -> Result<R,InvalidStateError>
+		where F: Fn(Vec<f64>,Vec<Vec<f64>>,Vec<Vec<f64>>) -> Result<R,InvalidStateError> {
+
+		self.apply_middle_and_out_gneric(o,u,after_callback)
 	}
 
 	fn latter_part_of_learning<O,E>(&mut self, t:&[f64],s:&SnapShot<f64>,optimizer:&mut O,lossf:&E) ->
@@ -840,20 +872,20 @@ impl<T> NNModel<T>
 			 AddAssign + PartialOrd +
 			 Exp + Tanh + InitialMax + IntegerPartOne + Max + Bias +
 			 Default + Clone + Copy + Send + Sync + 'static {
-	fn solve(&self,input:&[T]) -> Result<Vec<T>,InvalidStateError> {
+	fn solve_generic(&self,input:&[T]) -> Result<Vec<T>,InvalidStateError> {
 
-		self.apply(input,|r,_,_| Ok(r))
+		self.apply_gneric(input,|r,_,_| Ok(r))
 	}
 
-	fn solve_diff(&self,input:&[(usize,T)],s:&SnapShot<T>) -> Result<SnapShot<T>,InvalidStateError> {
-		self.apply_diff(input,s,|r,o,u| Ok(SnapShot::new(r,o,u,None)))
+	fn solve_diff_generic(&self,input:&[(usize,T)],s:&SnapShot<T>) -> Result<SnapShot<T>,InvalidStateError> {
+		self.apply_diff_gneric(input,s,|r,o,u| Ok(SnapShot::new(r,o,u,None)))
 	}
 
-	fn solve_shapshot(&self,input:&[T]) -> Result<SnapShot<T>,InvalidStateError> {
-		self.apply(input,|r,o,u| Ok(SnapShot::new(r,o,u,None)))
+	fn solve_shapshot_generic(&self,input:&[T]) -> Result<SnapShot<T>,InvalidStateError> {
+		self.apply_gneric(input,|r,o,u| Ok(SnapShot::new(r,o,u,None)))
 	}
 
-	pub fn apply<F,R>(&self,input:&[T],after_callback:F) -> Result<R,InvalidStateError>
+	fn apply_gneric<F,R>(&self,input:&[T],after_callback:F) -> Result<R,InvalidStateError>
 		where F: Fn(Vec<T>,Vec<Vec<T>>,Vec<Vec<T>>) -> Result<R,InvalidStateError> {
 		if input.len() != self.units[0].0 {
 			return Err(InvalidStateError::InvalidInput(String::from(
@@ -885,10 +917,10 @@ impl<T> NNModel<T>
 			}
 		}
 
-		self.apply_middle_and_out(o,u,after_callback)
+		self.apply_middle_and_out_gneric(o,u,after_callback)
 	}
 
-	pub fn apply_diff<F,R>(&self,input:&[(usize,T)],s:&SnapShot<T>,after_callback:F) -> Result<R,InvalidStateError>
+	fn apply_diff_gneric<F,R>(&self,input:&[(usize,T)],s:&SnapShot<T>,after_callback:F) -> Result<R,InvalidStateError>
 		where F: Fn(Vec<T>,Vec<Vec<T>>,Vec<Vec<T>>) -> Result<R,InvalidStateError> {
 		let mut o:Vec<Vec<T>> = Vec::with_capacity(self.units.len());
 		let mut u:Vec<Vec<T>> = Vec::with_capacity(self.units.len());
@@ -915,10 +947,10 @@ impl<T> NNModel<T>
 
 		u.push(ui);
 
-		self.apply_middle_and_out(o,u,after_callback)
+		self.apply_middle_and_out_gneric(o,u,after_callback)
 	}
 
-	fn apply_middle_and_out<F,R>(&self,mut o:Vec<Vec<T>>,mut u:Vec<Vec<T>>,after_callback:F) -> Result<R,InvalidStateError>
+	fn apply_middle_and_out_gneric<F,R>(&self,mut o:Vec<Vec<T>>,mut u:Vec<Vec<T>>,after_callback:F) -> Result<R,InvalidStateError>
 		where F: Fn(Vec<T>,Vec<Vec<T>>,Vec<Vec<T>>) -> Result<R,InvalidStateError> {
 		o.push(Vec::with_capacity(self.units[1].0 + 1));
 		o[1].resize_with(self.units[1].0 + 1, Default::default);
