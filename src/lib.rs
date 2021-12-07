@@ -1,9 +1,11 @@
 extern crate rand;
 extern crate rand_xorshift;
+extern crate statrs;
 
 pub mod function;
 pub mod error;
 pub mod persistence;
+pub mod types;
 
 use std::fmt;
 use error::*;
@@ -19,7 +21,7 @@ use function::loss::*;
 use function::optimizer::*;
 use std::sync::mpsc::Receiver;
 use std::ops::{AddAssign, Add, Mul, Sub, Div, Neg};
-use function::{Exp, Tanh, IntegerPartOne, InitialMax, Max};
+use types::*;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Metrics {

@@ -1,5 +1,5 @@
 use std::ops::{Add, Sub, Mul, Div, Neg};
-use function::{Exp, IntegerPartOne, Tanh, InitialMax, Max};
+use types::*;
 use std::marker::PhantomData;
 
 pub trait ActivateF<T>: Send + Sync + 'static
