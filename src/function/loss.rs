@@ -1,9 +1,9 @@
 use function::activation::ActivateF;
 
-pub trait LossFunction<T>: Send + Sync + 'static {
+pub trait LossFunction: Send + Sync + 'static {
 	fn apply(&self,r:f64,t:f64) -> f64;
 	fn derive(&self,r:f64,t:f64) -> f64;
-	fn is_canonical_link(&self,_:&Box<dyn ActivateF<T>>) -> bool {
+	fn is_canonical_link(&self,_:&Box<dyn ActivateF<f64>>) -> bool {
 		false
 	}
 }
@@ -15,7 +15,7 @@ impl Mse {
 		Mse {}
 	}
 }
-impl LossFunction<f64> for Mse {
+impl LossFunction for Mse {
 	fn apply(&self,r:f64,t:f64) -> f64 {
 		(r - t) * (r - t) / 2f64
 	}
@@ -39,7 +39,7 @@ impl CrossEntropy {
 		CrossEntropy {}
 	}
 }
-impl LossFunction<f64> for CrossEntropy {
+impl LossFunction for CrossEntropy {
 	fn apply(&self,r:f64,t:f64) -> f64 {
 		-t * r.ln() - (1.0f64 - t) * (1.0f64 - r).ln()
 	}
@@ -64,7 +64,7 @@ impl CrossEntropyMulticlass {
 
 	}
 }
-impl LossFunction<f64> for CrossEntropyMulticlass {
+impl LossFunction for CrossEntropyMulticlass {
 	fn apply(&self,r:f64,t:f64) -> f64 {
 		-t * r.ln()
 	}
@@ -78,5 +78,19 @@ impl LossFunction<f64> for CrossEntropyMulticlass {
 			"softmax" => true,
 			_ => false,
 		}
+	}
+}
+pub(crate) struct VoidLossFunction;
+impl LossFunction for VoidLossFunction {
+	fn apply(&self,_:f64,_:f64) -> f64 {
+		unreachable!()
+	}
+
+	fn derive(&self,_:f64,_:f64) -> f64 {
+		unreachable!()
+	}
+
+	fn is_canonical_link(&self,_:&Box<dyn ActivateF<f64>>) -> bool {
+		unreachable!()
 	}
 }

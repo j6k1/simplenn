@@ -20,8 +20,8 @@ use function::activation::*;
 use function::loss::*;
 use function::optimizer::*;
 use std::sync::mpsc::Receiver;
-use std::ops::{AddAssign, Add, Mul, Sub, Div, Neg};
 use types::*;
+use std::marker::PhantomData;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Metrics {
@@ -37,30 +37,18 @@ impl Bias for f64 {
 		1f64
 	}
 }
-impl Bias for u8 {
+impl Bias for FxS8 {
 	#[inline]
-	fn bias() -> u8 {
-		8
+	fn bias() -> FxS8 {
+		8.into()
 	}
 }
-pub struct NN<T,O,E>
-	where O: Optimizer, E: LossFunction<T>,
-		  T: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
-		     AddAssign + PartialOrd +
-		     Exp + Tanh + InitialMax + IntegerPartOne + Max + Bias +
-		     Default + Clone + Copy + Send + Sync + 'static {
+pub struct NN<T,O,E> where T: UnitValue<T>, O: Optimizer, E: LossFunction {
 	model:Arc<NNModel<T>>,
 	optimizer:O,
 	lossf:Arc<E>,
 }
-
-impl<T,O,E> NN<T,O,E>
-	where O: Optimizer, E: LossFunction<T>,
-		  T: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
-		     AddAssign + PartialOrd +
-		     Exp + Tanh + InitialMax + IntegerPartOne + Max + Bias +
-		     Default + Clone + Copy + Send + Sync + 'static {
-
+impl<T,O,E> NN<T,O,E> where T: UnitValue<T>, O: Optimizer, E: LossFunction {
 	pub fn new<F>(model:NNModel<T>,optimizer_creator:F,lossf:E) -> NN<T,O,E>
 		where F: Fn(&NNModel<T>) -> O {
 
@@ -73,8 +61,7 @@ impl<T,O,E> NN<T,O,E>
 		}
 	}
 }
-impl<O,E> NN<f64,O,E> where O: Optimizer, E: LossFunction<f64> {
-
+impl<O,E> NN<f64,O,E> where f64: UnitValue<f64>, O: Optimizer, E: LossFunction {
 	pub fn solve(&self,input:&[f64]) ->
 		Result<Vec<f64>,InvalidStateError> {
 
@@ -104,7 +91,7 @@ impl<O,E> NN<f64,O,E> where O: Optimizer, E: LossFunction<f64> {
 	}
 
 	pub fn learn(&mut self,input:&[f64],t:&[f64]) -> Result<Metrics,InvalidStateError>
-		where O: Optimizer, E: LossFunction<f64> {
+		where O: Optimizer, E: LossFunction {
 
 		match Arc::get_mut(&mut self.model) {
 			Some(ref mut model) => {
@@ -155,16 +142,155 @@ impl<O,E> NN<f64,O,E> where O: Optimizer, E: LossFunction<f64> {
 		Ok(())
 	}
 }
-pub struct NNUnits<T> {
+pub struct Quantization<O,E> {
+	o:PhantomData<O>,
+	e:PhantomData<E>
+}
+
+impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
+	fn quantization<T>(source:&NN<T,O,E>,mut max:T,mut min:T) ->
+		Result<NN<FxS8,VoidOptimizer,VoidLossFunction>,InvalidStateError>
+		where T: UnitValue<T>,
+			  FxS8: UnitValue<FxS8> {
+		if min > max {
+			std::mem::swap(&mut min,&mut max);
+		}
+
+		let mut unit_max = T::max_value();
+		let mut unit_min = -T::max_value();
+
+		let mut f = match source.model.units[1].1 {
+			Some(ref f) => f,
+			None => {
+				return Err(InvalidStateError::InvalidInput(String::from(
+					"Reference to the activation function object is not set."
+				)));
+			}
+		};
+
+		let mut next_max = vec![T::default();source.model.units[1].0];
+		let mut next_min = vec![T::default();source.model.units[1].0];
+
+		for (_,wl) in (0..source.model.units[0].0).zip(source.model.layers[0].iter()) {
+			for (u,&w) in next_max.iter_mut().zip(wl.iter()) {
+				let o = if w >= T::default() {
+					unit_max
+				} else {
+					unit_min
+				};
+				*u += o * w;
+				unit_max = unit_max.max(u);
+			}
+			for (u,&w) in next_min.iter_mut().zip(wl.iter()) {
+				let o = if w >= T::default() {
+					unit_min
+				} else {
+					unit_max
+				};
+				*u += o * w;
+				unit_max = unit_min.min(u);
+			}
+		}
+
+		let mut input_max = vec![T::default();source.model.units[1].0];
+
+		for (i,&ui) in input_max.iter_mut().zip(next_max.iter()) {
+			*i = f.apply(ui,&next_max);
+			unit_max = unit_max.max(i);
+		}
+
+		input_max.push(T::one());
+
+		let mut input_min = vec![T::default();source.model.units[1].0];
+
+		for (i,&ui) in input_min.iter_mut().zip(next_min.iter()) {
+			*i = f.apply(ui,&next_min);
+			unit_min = unit_min.min(i);
+		}
+
+		input_min.push(T::one());
+
+		next_max = vec![T::default();source.model.units[1].0];
+		next_min = vec![T::default();source.model.units[1].0];
+
+		for l in 1..(source.model.units.len()-1) {
+			for ((&umax,&umin),wl) in input_max.iter().zip(input_min.iter()).zip(source.model.layers[l].iter()) {
+				for (u,&w) in next_max.iter_mut().zip(wl.iter()) {
+					let o = if w >= T::default() {
+						umax
+					} else {
+						umin
+					};
+					*u += o * w;
+					unit_max = unit_max.max(u);
+				}
+				for (u,&w) in next_min.iter_mut().zip(wl.iter()) {
+					let o = if w >= T::default() {
+						umin
+					} else {
+						umax
+					};
+					*u += o * w;
+					unit_max = unit_min.max(u);
+				}
+			}
+
+			f = match source.model.units[l+1].1 {
+				Some(ref f) => f,
+				None => {
+					return Err(InvalidStateError::InvalidInput(String::from(
+						"Reference to the activation function object is not set."
+					)));
+				}
+			};
+
+			input_max = vec![T::default();source.model.units[l+1].0];
+
+			for (i,&ui) in input_max.iter_mut().zip(next_max.iter()) {
+				*i = f.apply(ui,&next_max);
+				unit_max = unit_max.max(i);
+			}
+
+			input_max.push(T::one());
+
+			let mut input_min = vec![T::default();source.model.units[l+1].0];
+
+			for (i,&ui) in input_min.iter_mut().zip(next_min.iter()) {
+				*i = f.apply(ui,&next_min);
+				unit_min = unit_min.min(i);
+			}
+
+			input_min.push(T::one());
+		}
+
+		let mut units = Vec::new();
+
+		for &(s,f) in source.model.units.iter() {
+			units.push((s,f.as_ref().map(|f| f.as_activate_function())));
+		}
+
+		let mut layers:Vec<Vec<Vec<FxS8>>> = Vec::new();
+
+		let mut rnd = rand::thread_rng();
+		let mut rnd = XorShiftRng::from_seed(rnd.gen());
+
+		Ok(NN {
+			model: Arc::new(NNModel {
+				units:units,
+				layers:layers,
+				hash:rnd.gen()
+			}),
+			optimizer:VoidOptimizer,
+			lossf:Arc::new(VoidLossFunction),
+		})
+	}
+}
+#[derive(Clone)]
+pub struct NNUnits<T> where T: UnitValue<T> {
 	input_units:usize,
 	defs:Vec<(usize,Box<dyn ActivateF<T>>)>,
 }
-impl<T> NNUnits<T>
-	where T: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
-			 AddAssign + PartialOrd +
-			 Exp + Tanh + InitialMax + IntegerPartOne + Max + Bias +
-			 Default + Clone + Copy + Send + Sync + 'static {
-
+impl<T> NNUnits<T> where T: UnitValue<T> {
 	pub fn new(input_units:usize, l1:(usize,Box<dyn ActivateF<T>>),l2:(usize,Box<dyn ActivateF<T>>)) -> NNUnits<T> {
 		let mut defs:Vec<(usize,Box<dyn ActivateF<T>>)> = Vec::new();
 		defs.push(l1);
@@ -180,16 +306,12 @@ impl<T> NNUnits<T>
 		self
 	}
 }
-pub struct NNModel<T>
-	where T: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
-		  AddAssign + PartialOrd +
-		  Exp + Tanh + InitialMax + IntegerPartOne + Max + Bias +
-		  Default + Clone + Copy + Send + Sync + 'static {
+pub struct NNModel<T> where T: UnitValue<T> {
 	units:Vec<(usize,Option<Box<dyn ActivateF<T>>>)>,
 	layers:Vec<Vec<Vec<T>>>,
 	hash:u64,
 }
-impl NNModel<f64> {
+impl NNModel<f64> where f64: UnitValue<f64> {
 	pub fn load<I,E>(mut reader:I) -> Result<NNModel<f64>, E>
 		where I: ModelInputReader<E>, E: Error, StartupError<E>: From<E> {
 		reader.read_model()
@@ -366,7 +488,7 @@ impl NNModel<f64> {
 	pub fn apply<F,R>(&self,input:&[f64],after_callback:F) -> Result<R,InvalidStateError>
 		where F: Fn(Vec<f64>,Vec<Vec<f64>>,Vec<Vec<f64>>) -> Result<R,InvalidStateError> {
 
-		self.apply_gneric(input,after_callback)
+		self.apply_generic(input, after_callback)
 	}
 
 	pub fn apply_diff<F,R>(&self,input:&[(usize,f64)],s:&SnapShot<f64>,after_callback:F) -> Result<R,InvalidStateError>
@@ -383,7 +505,7 @@ impl NNModel<f64> {
 	}
 
 	fn latter_part_of_learning<O,E>(&mut self, t:&[f64],s:&SnapShot<f64>,optimizer:&mut O,lossf:&E) ->
-		Result<Metrics,InvalidStateError> where O: Optimizer, E: LossFunction<f64> {
+		Result<Metrics,InvalidStateError> where O: Optimizer, E: LossFunction {
 
 		if s.hash.map(|h| h != self.hash).unwrap_or(false) {
 			return Err(InvalidStateError::GenerationError(String::from(
@@ -500,7 +622,7 @@ impl NNModel<f64> {
 	}
 
 	fn learn<O,E>(&mut self,input:&[f64],t:&[f64],optimizer:&mut O,lossf:&E) -> Result<Metrics,InvalidStateError>
-		where O: Optimizer, E: LossFunction<f64> {
+		where O: Optimizer, E: LossFunction {
 
 		let s = self.promise_of_learn(input)?;
 
@@ -508,7 +630,7 @@ impl NNModel<f64> {
 	}
 
 	fn learn_batch<O,E,I>(&mut self,it:I,optimizer:&mut O,lossf:&E) -> Result<Metrics,InvalidStateError>
-		where O: Optimizer, E: LossFunction<f64>, I: Iterator<Item = (Vec<f64>,Vec<f64>)> {
+		where O: Optimizer, E: LossFunction, I: Iterator<Item = (Vec<f64>,Vec<f64>)> {
 
 		let mut batch_size = 0;
 		let mut de_dw_total:Vec<Vec<Vec<f64>>> = Vec::with_capacity(self.layers.len());
@@ -640,7 +762,7 @@ impl NNModel<f64> {
 
 	fn learn_batch_parallel<O,E,I>(self:&mut Arc<Self>,threads:usize,it:I,optimizer:&mut O,lossf:Arc<E>) -> Result<Metrics,InvalidStateError>
 		where O: Optimizer,
-			  E: LossFunction<f64>,
+			  E: LossFunction,
 			  I: ExactSizeIterator<Item = (Vec<f64>,Vec<f64>)>,
 			  NNModel<f64>: Send + Sync + 'static {
 		let batch_size = it.len();
@@ -869,14 +991,9 @@ impl NNModel<f64> {
 		self.apply(input,|r,o,u| Ok(SnapShot::new(r,o,u,Some(self.hash))))
 	}
 }
-impl<T> NNModel<T>
-	where T: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
-			 AddAssign + PartialOrd +
-			 Exp + Tanh + InitialMax + IntegerPartOne + Max + Bias +
-			 Default + Clone + Copy + Send + Sync + 'static {
+impl<T> NNModel<T> where T: UnitValue<T> {
 	fn solve_generic(&self,input:&[T]) -> Result<Vec<T>,InvalidStateError> {
-
-		self.apply_gneric(input,|r,_,_| Ok(r))
+		self.apply_generic(input, |r, _, _| Ok(r))
 	}
 
 	fn solve_diff_generic(&self,input:&[(usize,T)],s:&SnapShot<T>) -> Result<SnapShot<T>,InvalidStateError> {
@@ -884,10 +1001,10 @@ impl<T> NNModel<T>
 	}
 
 	fn solve_shapshot_generic(&self,input:&[T]) -> Result<SnapShot<T>,InvalidStateError> {
-		self.apply_gneric(input,|r,o,u| Ok(SnapShot::new(r,o,u,None)))
+		self.apply_generic(input, |r, o, u| Ok(SnapShot::new(r, o, u, None)))
 	}
 
-	fn apply_gneric<F,R>(&self,input:&[T],after_callback:F) -> Result<R,InvalidStateError>
+	fn apply_generic<F,R>(&self, input:&[T], after_callback:F) -> Result<R,InvalidStateError>
 		where F: Fn(Vec<T>,Vec<Vec<T>>,Vec<Vec<T>>) -> Result<R,InvalidStateError> {
 		if input.len() != self.units[0].0 {
 			return Err(InvalidStateError::InvalidInput(String::from(

@@ -1,11 +1,28 @@
 use std::convert::From;
-use std::ops::{Add, Mul, Sub, Div};
+use std::ops::{Add, Mul, Sub, Div, AddAssign, Neg};
+use std::fmt;
+use Bias;
 
 const FIXED_I8_E:i8 = (2.71828182845904 * 8.) as i8;
 
+pub trait UnitValue<T>: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
+                        AddAssign + PartialOrd +
+                        Clone + Copy + Default + Send + Sync + 'static +
+                        Exp + Tanh + InitialMax + One + Max + Min + MaxValue + Bias {
+
+}
 #[derive(Clone,Copy,PartialOrd, PartialEq,Ord,Eq)]
 pub struct FxS8 {
     raw:i8
+}
+impl FxS8 {
+    pub fn new(integer:i8,decimal:i8) -> FxS8 {
+        let sign = integer >> 7;
+
+        FxS8 {
+            raw:(integer & 0b1111) << 3 | sign | decimal & 0b111
+        }
+    }
 }
 impl From<i8> for FxS8 {
     fn from(raw:i8) -> FxS8 {
@@ -19,6 +36,11 @@ impl Add for FxS8 {
 
     fn add(self,other:FxS8) -> FxS8 {
         (self.raw + other.raw).into()
+    }
+}
+impl AddAssign for FxS8 {
+    fn add_assign(&mut self,other:FxS8) {
+        *self = *self + other;
     }
 }
 impl Sub for FxS8 {
@@ -42,6 +64,31 @@ impl Div for FxS8 {
         (self.raw << 3 / other.raw).into()
     }
 }
+impl Neg for FxS8 {
+    type Output = Self;
+
+    fn neg(self) -> FxS8 {
+        FxS8 {
+            raw:-self.raw
+        }
+    }
+}
+impl Default for FxS8 {
+    fn default() -> FxS8 {
+        0.into()
+    }
+}
+impl fmt::Display for FxS8 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let sign = self.raw >> 7;
+
+        if sign == 0 {
+            write!(f, "{}.{}",self.raw >> 3 &0b1111 | sign, self.raw & 3)
+        } else {
+            write!(f, "{}.{}",self.raw >> 3 &0b1111 | sign, 0 - self.raw & 3)
+        }
+    }
+}
 pub trait Max {
     fn max(&self,other:&Self) -> Self;
 }
@@ -55,8 +102,36 @@ impl Max for FxS8 {
         self.raw.max(other.raw).into()
     }
 }
-pub trait IntegerPartOne {
-    fn integer_part_one() -> Self;
+pub trait Min {
+    fn min(&self,other:&Self) -> Self;
+}
+impl Min for f64 {
+    fn min(&self,other:&f64) -> f64 {
+        (*self).min(*other)
+    }
+}
+impl Min for FxS8 {
+    fn min(&self,other:&FxS8) -> FxS8 {
+        self.raw.min(other.raw).into()
+    }
+}
+pub trait MaxValue {
+    fn max_value() -> Self;
+}
+impl MaxValue for f64 {
+    fn max_value() -> f64 {
+        f64::MAX
+    }
+}
+impl MaxValue for FxS8 {
+    fn max_value() -> FxS8 {
+        FxS8 {
+            raw:i8::MAX
+        }
+    }
+}
+pub trait One {
+    fn one() -> Self;
 }
 pub trait Pow {
     fn pow(&self,u32) -> Self;
@@ -67,15 +142,15 @@ pub trait Exp {
 pub trait Tanh {
     fn tanh(&self) -> Self;
 }
-impl IntegerPartOne for f64 {
+impl One for f64 {
     #[inline]
-    fn integer_part_one() -> f64 {
+    fn one() -> f64 {
         1f64
     }
 }
-impl IntegerPartOne for FxS8 {
+impl One for FxS8 {
     #[inline]
-    fn integer_part_one() -> FxS8 {
+    fn one() -> FxS8 {
         8i8.into()
     }
 }
@@ -130,9 +205,11 @@ impl Tanh for f64 {
         (*self).tanh()
     }
 }
-impl Tanh for FxS8 where FxS8: Exp + IntegerPartOne {
+impl Tanh for FxS8 where FxS8: Exp + One {
     #[inline]
     fn tanh(&self) -> FxS8 {
-        (FxS8::integer_part_one() - self.exp()) / (FxS8::integer_part_one() + self.exp())
+        (FxS8::one() - self.exp()) / (FxS8::one() + self.exp())
     }
 }
+impl UnitValue<f64> for f64 {}
+impl UnitValue<FxS8> for FxS8 {}

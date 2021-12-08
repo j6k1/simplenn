@@ -2,15 +2,19 @@ use std::ops::{Add, Sub, Mul, Div, Neg};
 use types::*;
 use std::marker::PhantomData;
 
-pub trait ActivateF<T>: Send + Sync + 'static
+pub trait ActivateF<T>: AsActivateF<FxS8> + Send + Sync + 'static
 	where T: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
-			 PartialOrd + Exp + Tanh + InitialMax + IntegerPartOne + Max +
+			 PartialOrd + Exp + Tanh + InitialMax + One + Max +
 			 Default + Clone + Copy + Send + Sync + 'static {
 
 	fn apply(&self,u:T,v:&[T]) -> T;
 	fn derive(&self,e:T) -> T;
 	fn kind(&self) -> &str;
 }
+pub trait AsActivateF<T>: Send + Sync + 'static where T: Send + Sync + 'static {
+	fn as_activate_function(&self) -> Box<dyn ActivateF<T>>;
+}
+#[derive(Clone)]
 pub struct FIdentity<T> {
 	t:PhantomData<T>
 }
@@ -24,20 +28,26 @@ impl<T> FIdentity<T> {
 }
 impl<T> ActivateF<T> for FIdentity<T>
 	where T: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
-			 PartialOrd + Exp + Tanh + InitialMax + IntegerPartOne + Max +
+			 PartialOrd + Exp + Tanh + InitialMax + One + Max +
 			 Default + Clone + Copy + Send + Sync + 'static {
 	fn apply(&self,u:T,_:&[T]) -> T {
 		u
 	}
 
 	fn derive(&self,_:T) -> T {
-		T::integer_part_one()
+		T::one()
 	}
 
 	fn kind(&self) -> &str {
 		"identity"
 	}
 }
+impl<T> AsActivateF<FxS8> for FIdentity<T> where T: Send + Sync + 'static {
+	fn as_activate_function(&self) -> Box<dyn ActivateF<FxS8>> {
+		Box::new(FIdentity::new())
+	}
+}
+#[derive(Clone)]
 pub struct FSigmoid<T> {
 	t:PhantomData::<T>
 }
@@ -50,21 +60,27 @@ impl<T> FSigmoid<T> {
 }
 impl<T> ActivateF<T> for FSigmoid<T>
 	where T: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
-			 PartialOrd + Exp + Tanh + InitialMax + IntegerPartOne + Max +
+			 PartialOrd + Exp + Tanh + InitialMax + One + Max +
 			 Default + Clone + Copy + Send + Sync + 'static {
 	fn apply(&self,u:T,_:&[T]) -> T {
-		T::integer_part_one() / (T::integer_part_one() + (-u).exp())
+		T::one() / (T::one() + (-u).exp())
 	}
 
 	fn derive(&self,e:T) -> T {
-		let e = T::integer_part_one() / (T::integer_part_one() + (-e).exp());
-		e * (T::integer_part_one() - e)
+		let e = T::one() / (T::one() + (-e).exp());
+		e * (T::one() - e)
 	}
 
 	fn kind(&self) -> &str {
 		"sigmoid"
 	}
 }
+impl<T> AsActivateF<FxS8> for FSigmoid<T> where T: Send + Sync + 'static {
+	fn as_activate_function(&self) -> Box<dyn ActivateF<FxS8>> {
+		Box::new(FSigmoid::new())
+	}
+}
+#[derive(Clone)]
 pub struct FReLU<T> {
 	t:PhantomData::<T>
 }
@@ -77,7 +93,7 @@ impl<T> FReLU<T> {
 }
 impl<T> ActivateF<T> for FReLU<T>
 	where T: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
-			 PartialOrd + Exp + Tanh + InitialMax + IntegerPartOne + Max +
+			 PartialOrd + Exp + Tanh + InitialMax + One + Max +
 			 Default + Clone + Copy + Send + Sync + 'static {
 	fn apply(&self,u:T,_:&[T]) -> T {
 		match u {
@@ -91,7 +107,7 @@ impl<T> ActivateF<T> for FReLU<T>
 	fn derive(&self,e:T) -> T {
 		match e {
 			e if e > T::default() => {
-				T::integer_part_one()
+				T::one()
 			},
 			_ => T::default(),
 		}
@@ -101,6 +117,12 @@ impl<T> ActivateF<T> for FReLU<T>
 		"relu"
 	}
 }
+impl<T> AsActivateF<FxS8> for FReLU<T> where T: Send + Sync + 'static {
+	fn as_activate_function(&self) -> Box<dyn ActivateF<FxS8>> {
+		Box::new(FReLU::new())
+	}
+}
+#[derive(Clone)]
 pub struct FTanh<T> {
 	t:PhantomData::<T>
 }
@@ -113,7 +135,7 @@ impl<T> FTanh<T> {
 }
 impl<T> ActivateF<T> for FTanh<T>
 	where T: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
-			 PartialOrd + Exp + Tanh + InitialMax + IntegerPartOne + Max +
+			 PartialOrd + Exp + Tanh + InitialMax + One + Max +
 			 Default + Clone + Copy + Send + Sync + 'static {
 	fn apply(&self,u:T,_:&[T]) -> T {
 		u.tanh()
@@ -121,13 +143,19 @@ impl<T> ActivateF<T> for FTanh<T>
 
 	fn derive(&self,e:T) -> T {
 		let e = e.tanh();
-		T::integer_part_one() - e * e
+		T::one() - e * e
 	}
 
 	fn kind(&self) -> &str {
 		"tanh"
 	}
 }
+impl<T> AsActivateF<FxS8> for FTanh<T> where T: Send + Sync + 'static {
+	fn as_activate_function(&self) -> Box<dyn ActivateF<FxS8>> {
+		Box::new(FTanh::new())
+	}
+}
+#[derive(Clone)]
 pub struct FSoftMax<T> {
 	t:PhantomData::<T>
 }
@@ -140,7 +168,7 @@ impl<T> FSoftMax<T> {
 }
 impl<T> ActivateF<T> for FSoftMax<T>
 	where T: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
-			 PartialOrd + Exp + Tanh + InitialMax + IntegerPartOne + Max +
+			 PartialOrd + Exp + Tanh + InitialMax + One + Max +
 			 Default + Clone + Copy + Send + Sync + 'static {
 
 	fn apply(&self,u:T,v:&[T]) -> T {
@@ -150,10 +178,15 @@ impl<T> ActivateF<T> for FSoftMax<T>
 	}
 
 	fn derive(&self,e:T) -> T {
-		e * (T::integer_part_one() - e)
+		e * (T::one() - e)
 	}
 
 	fn kind(&self) -> &str {
 		"softmax"
+	}
+}
+impl<T> AsActivateF<FxS8> for FSoftMax<T> where T: Send + Sync + 'static {
+	fn as_activate_function(&self) -> Box<dyn ActivateF<FxS8>> {
+		Box::new(FSoftMax::new())
 	}
 }
