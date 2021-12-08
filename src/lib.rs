@@ -303,7 +303,7 @@ pub struct NNUnits<T> where T: UnitValue<T> {
 	input_units:usize,
 	defs:Vec<(usize,Box<dyn ActivateF<T>>)>,
 }
-impl<T> NNUnits<T> where T: UnitValue<T>, Box<dyn ActivateF<T> + 'static>: Sized + Clone {
+impl<T> NNUnits<T> where T: UnitValue<T> {
 	pub fn new(input_units:usize, l1:(usize,Box<dyn ActivateF<T>>),l2:(usize,Box<dyn ActivateF<T>>)) -> NNUnits<T> {
 		let mut defs:Vec<(usize,Box<dyn ActivateF<T>>)> = Vec::new();
 		defs.push(l1);
@@ -314,8 +314,7 @@ impl<T> NNUnits<T> where T: UnitValue<T>, Box<dyn ActivateF<T> + 'static>: Sized
 		}
 	}
 
-	pub fn add(mut self, units:(usize,Box<dyn ActivateF<T>>)) -> NNUnits<T>
-		where Box<dyn ActivateF<T> + 'static>: Sized + Clone {
+	pub fn add(mut self, units:(usize,Box<dyn ActivateF<T>>)) -> NNUnits<T> {
 		self.defs.push(units);
 		self
 	}

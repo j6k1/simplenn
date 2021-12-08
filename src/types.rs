@@ -8,7 +8,7 @@ const FIXED_I8_E:i8 = (2.71828182845904 * 8.) as i8;
 pub trait UnitValue<T>: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
                         AddAssign + PartialOrd +
                         Clone + Copy + Default + Send + Sync + 'static +
-                        Exp + Tanh + InitialMax + One + Max + Min + MaxValue + Bias {
+                        Exp + Tanh + InitialMax + One + Max + Min + MaxValue + Abs + Bias {
 
 }
 #[derive(Clone,Copy,PartialOrd, PartialEq,Ord,Eq)]
@@ -86,6 +86,13 @@ impl fmt::Display for FxS8 {
             write!(f, "{}.{}",self.raw >> 3 &0b1111 | sign, self.raw & 3)
         } else {
             write!(f, "{}.{}",self.raw >> 3 &0b1111 | sign, 0 - self.raw & 3)
+        }
+    }
+}
+impl From<f64> for FxS8 {
+    fn from(source:f64) -> FxS8 {
+        FxS8 {
+            raw: source as i8
         }
     }
 }
@@ -209,6 +216,23 @@ impl Tanh for FxS8 where FxS8: Exp + One {
     #[inline]
     fn tanh(&self) -> FxS8 {
         (FxS8::one() - self.exp()) / (FxS8::one() + self.exp())
+    }
+}
+pub trait Abs {
+    fn abs(&self) -> Self;
+}
+impl Abs for f64 {
+    fn abs(&self) -> f64 {
+        (*self).abs()
+    }
+}
+impl Abs for FxS8 {
+    fn abs(&self) -> FxS8 {
+        if self.raw < 0 {
+            -(*self)
+        } else {
+            *self
+        }
     }
 }
 impl UnitValue<f64> for f64 {}
