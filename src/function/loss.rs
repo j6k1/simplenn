@@ -80,7 +80,7 @@ impl LossFunction for CrossEntropyMulticlass {
 		}
 	}
 }
-pub(crate) struct VoidLossFunction;
+pub struct VoidLossFunction;
 impl LossFunction for VoidLossFunction {
 	fn apply(&self,_:f64,_:f64) -> f64 {
 		unreachable!()

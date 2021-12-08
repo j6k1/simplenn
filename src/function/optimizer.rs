@@ -206,7 +206,7 @@ impl Optimizer for Adam {
 		self.b2t = b2t * b2;
 	}
 }
-pub(crate) struct VoidOptimizer;
+pub struct VoidOptimizer;
 impl Optimizer for VoidOptimizer {
 	fn update(&mut self,_:usize,_:usize,_:&[f64], _:&Vec<f64>,_:&mut Vec<f64>) {
 		unreachable!()

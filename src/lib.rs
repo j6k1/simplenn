@@ -148,10 +148,10 @@ pub struct Quantization<O,E> {
 }
 
 impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
-	fn quantization<T>(source:&NN<T,O,E>,mut max:T,mut min:T) ->
+	pub fn quantization<T>(source:&NN<T,O,E>,mut max:T,mut min:T) ->
 		Result<NN<FxS8,VoidOptimizer,VoidLossFunction>,InvalidStateError>
 		where T: UnitValue<T>,
-			  FxS8: UnitValue<FxS8> {
+			  FxS8: UnitValue<FxS8> + From<T> {
 		if min > max {
 			std::mem::swap(&mut min,&mut max);
 		}
@@ -210,10 +210,10 @@ impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
 
 		input_min.push(T::one());
 
-		next_max = vec![T::default();source.model.units[1].0];
-		next_min = vec![T::default();source.model.units[1].0];
-
 		for l in 1..(source.model.units.len()-1) {
+			next_max = vec![T::default();source.model.units[l+1].0];
+			next_min = vec![T::default();source.model.units[l+1].0];
+
 			for ((&umax,&umin),wl) in input_max.iter().zip(input_min.iter()).zip(source.model.layers[l].iter()) {
 				for (u,&w) in next_max.iter_mut().zip(wl.iter()) {
 					let o = if w >= T::default() {
@@ -231,7 +231,7 @@ impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
 						umax
 					};
 					*u += o * w;
-					unit_max = unit_min.max(u);
+					unit_min = unit_min.min(u);
 				}
 			}
 
@@ -269,8 +269,22 @@ impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
 			units.push((*s,f.as_ref().map(|f| f.as_activate_function())));
 		}
 
+		let factor = unit_max.abs().max(&unit_min.abs());
+
 		let mut layers:Vec<Vec<Vec<FxS8>>> = Vec::new();
 
+		for i in 0..source.model.units.len()-1 {
+			layers.push(Vec::new());
+
+			for j in 0..source.model.units[i].0+1 {
+				layers[i].push(Vec::with_capacity(source.model.units[i].0+1));
+				layers[i].resize_with(source.model.units[i].0,Default::default);
+
+				for k in 0..source.model.units[i+1].0 {
+					layers[i][j].push((source.model.layers[i][j][k] / factor).into())
+				}
+			}
+		}
 		let mut rnd = rand::thread_rng();
 		let mut rnd = XorShiftRng::from_seed(rnd.gen());
 
