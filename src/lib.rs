@@ -142,6 +142,19 @@ impl<O,E> NN<f64,O,E> where f64: UnitValue<f64>, O: Optimizer, E: LossFunction {
 		Ok(())
 	}
 }
+impl<O,E> NN<FxS8,O,E> where FxS8: UnitValue<FxS8>, O: Optimizer, E: LossFunction {
+	pub fn solve(&self, input: &[FxS8]) -> Result<Vec<FxS8>, InvalidStateError> {
+		self.model.solve(input)
+	}
+
+	pub fn solve_shapshot(&self, input: &[FxS8]) -> Result<SnapShot<FxS8>, InvalidStateError> {
+		self.model.solve_shapshot(input)
+	}
+
+	pub fn solve_diff(&self, input: &[(usize, FxS8)], snapshot: &SnapShot<FxS8>) -> Result<SnapShot<FxS8>, InvalidStateError> {
+		self.model.solve_diff(input, snapshot)
+	}
+}
 pub struct Quantization<O,E> {
 	o:PhantomData<O>,
 	e:PhantomData<E>
@@ -324,7 +337,7 @@ pub struct NNModel<T> where T: UnitValue<T> {
 	layers:Vec<Vec<Vec<T>>>,
 	hash:u64,
 }
-impl NNModel<f64> where f64: UnitValue<f64>, Box<dyn ActivateF<f64>>: Sized {
+impl NNModel<f64> where f64: UnitValue<f64> {
 	pub fn load<I,E>(mut reader:I) -> Result<NNModel<f64>, E>
 		where I: ModelInputReader<E>, E: Error, StartupError<E>: From<E> {
 		reader.read_model()
@@ -1002,6 +1015,38 @@ impl NNModel<f64> where f64: UnitValue<f64>, Box<dyn ActivateF<f64>>: Sized {
 		self.hash = rnd.gen();
 
 		self.apply(input,|r,o,u| Ok(SnapShot::new(r,o,u,Some(self.hash))))
+	}
+}
+impl NNModel<FxS8> {
+	fn solve(&self,input:&[FxS8]) -> Result<Vec<FxS8>,InvalidStateError> {
+		self.solve_generic(input)
+	}
+
+	fn solve_diff(&self,input:&[(usize,FxS8)],s:&SnapShot<FxS8>) -> Result<SnapShot<FxS8>,InvalidStateError> {
+		self.solve_diff_generic(input,s)
+	}
+
+	fn solve_shapshot(&self,input:&[FxS8]) -> Result<SnapShot<FxS8>,InvalidStateError> {
+		self.solve_shapshot_generic(input)
+	}
+
+	pub fn apply<F,R>(&self,input:&[FxS8],after_callback:F) -> Result<R,InvalidStateError>
+		where F: Fn(Vec<FxS8>,Vec<Vec<FxS8>>,Vec<Vec<FxS8>>) -> Result<R,InvalidStateError> {
+
+		self.apply_generic(input, after_callback)
+	}
+
+	pub fn apply_diff<F,R>(&self,input:&[(usize,FxS8)],s:&SnapShot<FxS8>,after_callback:F) -> Result<R,InvalidStateError>
+		where F: Fn(Vec<FxS8>,Vec<Vec<FxS8>>,Vec<Vec<FxS8>>) -> Result<R,InvalidStateError> {
+
+		self.apply_diff_gneric(input,s,after_callback)
+	}
+
+	#[allow(unused)]
+	fn apply_middle_and_out<F,R>(&self,o:Vec<Vec<FxS8>>,u:Vec<Vec<FxS8>>,after_callback:F) -> Result<R,InvalidStateError>
+		where F: Fn(Vec<FxS8>,Vec<Vec<FxS8>>,Vec<Vec<FxS8>>) -> Result<R,InvalidStateError> {
+
+		self.apply_middle_and_out_gneric(o,u,after_callback)
 	}
 }
 impl<T> NNModel<T> where T: UnitValue<T> {
