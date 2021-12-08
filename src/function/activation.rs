@@ -1,12 +1,7 @@
-use std::ops::{Add, Sub, Mul, Div, Neg};
 use types::*;
 use std::marker::PhantomData;
 
-pub trait ActivateF<T>: AsActivateF<FxS8> + Send + Sync + 'static
-	where T: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
-			 PartialOrd + Exp + Tanh + InitialMax + One + Max +
-			 Default + Clone + Copy + Send + Sync + 'static {
-
+pub trait ActivateF<T>: AsActivateF<FxS8> + Send + Sync + 'static where T: UnitValue<T> {
 	fn apply(&self,u:T,v:&[T]) -> T;
 	fn derive(&self,e:T) -> T;
 	fn kind(&self) -> &str;
@@ -26,10 +21,7 @@ impl<T> FIdentity<T> {
 		}
 	}
 }
-impl<T> ActivateF<T> for FIdentity<T>
-	where T: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
-			 PartialOrd + Exp + Tanh + InitialMax + One + Max +
-			 Default + Clone + Copy + Send + Sync + 'static {
+impl<T> ActivateF<T> for FIdentity<T> where T: UnitValue<T> {
 	fn apply(&self,u:T,_:&[T]) -> T {
 		u
 	}
@@ -58,10 +50,7 @@ impl<T> FSigmoid<T> {
 		}
 	}
 }
-impl<T> ActivateF<T> for FSigmoid<T>
-	where T: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
-			 PartialOrd + Exp + Tanh + InitialMax + One + Max +
-			 Default + Clone + Copy + Send + Sync + 'static {
+impl<T> ActivateF<T> for FSigmoid<T> where T: UnitValue<T> {
 	fn apply(&self,u:T,_:&[T]) -> T {
 		T::one() / (T::one() + (-u).exp())
 	}
@@ -91,10 +80,7 @@ impl<T> FReLU<T> {
 		}
 	}
 }
-impl<T> ActivateF<T> for FReLU<T>
-	where T: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
-			 PartialOrd + Exp + Tanh + InitialMax + One + Max +
-			 Default + Clone + Copy + Send + Sync + 'static {
+impl<T> ActivateF<T> for FReLU<T> where T: UnitValue<T> {
 	fn apply(&self,u:T,_:&[T]) -> T {
 		match u {
 			u if u > T::default() => {
@@ -133,10 +119,7 @@ impl<T> FTanh<T> {
 		}
 	}
 }
-impl<T> ActivateF<T> for FTanh<T>
-	where T: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
-			 PartialOrd + Exp + Tanh + InitialMax + One + Max +
-			 Default + Clone + Copy + Send + Sync + 'static {
+impl<T> ActivateF<T> for FTanh<T> where T: UnitValue<T> {
 	fn apply(&self,u:T,_:&[T]) -> T {
 		u.tanh()
 	}
@@ -166,11 +149,7 @@ impl<T> FSoftMax<T> {
 		}
 	}
 }
-impl<T> ActivateF<T> for FSoftMax<T>
-	where T: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
-			 PartialOrd + Exp + Tanh + InitialMax + One + Max +
-			 Default + Clone + Copy + Send + Sync + 'static {
-
+impl<T> ActivateF<T> for FSoftMax<T> where T: UnitValue<T> {
 	fn apply(&self,u:T,v:&[T]) -> T {
 		let alpha = v.iter().fold(T::initial_max(), |m,&v| v.max(&m));
 		let numer = (u - alpha).exp();

@@ -265,8 +265,8 @@ impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
 
 		let mut units = Vec::new();
 
-		for &(s,f) in source.model.units.iter() {
-			units.push((s,f.as_ref().map(|f| f.as_activate_function())));
+		for (s,f) in source.model.units.iter() {
+			units.push((*s,f.as_ref().map(|f| f.as_activate_function())));
 		}
 
 		let mut layers:Vec<Vec<Vec<FxS8>>> = Vec::new();
@@ -285,12 +285,11 @@ impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
 		})
 	}
 }
-#[derive(Clone)]
 pub struct NNUnits<T> where T: UnitValue<T> {
 	input_units:usize,
 	defs:Vec<(usize,Box<dyn ActivateF<T>>)>,
 }
-impl<T> NNUnits<T> where T: UnitValue<T> {
+impl<T> NNUnits<T> where T: UnitValue<T>, Box<dyn ActivateF<T> + 'static>: Sized + Clone {
 	pub fn new(input_units:usize, l1:(usize,Box<dyn ActivateF<T>>),l2:(usize,Box<dyn ActivateF<T>>)) -> NNUnits<T> {
 		let mut defs:Vec<(usize,Box<dyn ActivateF<T>>)> = Vec::new();
 		defs.push(l1);
@@ -301,7 +300,8 @@ impl<T> NNUnits<T> where T: UnitValue<T> {
 		}
 	}
 
-	pub fn add(mut self, units:(usize,Box<dyn ActivateF<T>>)) -> NNUnits<T> {
+	pub fn add(mut self, units:(usize,Box<dyn ActivateF<T>>)) -> NNUnits<T>
+		where Box<dyn ActivateF<T> + 'static>: Sized + Clone {
 		self.defs.push(units);
 		self
 	}
@@ -311,7 +311,7 @@ pub struct NNModel<T> where T: UnitValue<T> {
 	layers:Vec<Vec<Vec<T>>>,
 	hash:u64,
 }
-impl NNModel<f64> where f64: UnitValue<f64> {
+impl NNModel<f64> where f64: UnitValue<f64>, Box<dyn ActivateF<f64>>: Sized {
 	pub fn load<I,E>(mut reader:I) -> Result<NNModel<f64>, E>
 		where I: ModelInputReader<E>, E: Error, StartupError<E>: From<E> {
 		reader.read_model()
@@ -394,7 +394,7 @@ impl NNModel<f64> where f64: UnitValue<f64> {
 												mut initializer:F) ->
 		Result<NNModel<f64>,StartupError<E>>
 		where I: InputReader<E>, F: FnMut() -> f64,
-				B: FnMut() -> f64, E: Error + fmt::Debug, StartupError<E>: From<E> {
+			  B: FnMut() -> f64, E: Error + fmt::Debug, StartupError<E>: From<E> {
 
 		let iunits = units.input_units;
 		let mut sunits = units.defs.iter().map(|u| u.0).collect::<Vec<usize>>();
