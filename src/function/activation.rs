@@ -151,7 +151,7 @@ impl<T> FSoftMax<T> {
 }
 impl<T> ActivateF<T> for FSoftMax<T> where T: UnitValue<T> {
 	fn apply(&self,u:T,v:&[T]) -> T {
-		let alpha = v.iter().fold(T::max_value(), |m,&v| v.max(&m));
+		let alpha = v.iter().fold(T::infinite_value(), |m,&v| v.max(&m));
 		let numer = (u - alpha).exp();
 		numer / v.iter().fold(T::default(),|acc, &x| acc + (x - alpha).exp())
 	}

@@ -7,7 +7,7 @@ use std::fmt::Debug;
 pub trait UnitValue<T>: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
                         AddAssign + PartialOrd +
                         Clone + Copy + Default + Debug + From<i8> + Send + Sync + 'static +
-                        Exp + Tanh + One + Max + Min + MaxValue + Abs + Bias {
+                        Exp + Tanh + One + Max + Min + MaxValue + InfiniteValue + Abs + Bias {
 
 }
 #[derive(Debug,Clone,Copy,PartialOrd, PartialEq,Ord,Eq)]
@@ -139,6 +139,19 @@ impl MaxValue for FxS8 {
         FxS8 {
             raw:i8::MAX
         }
+    }
+}
+pub trait InfiniteValue {
+    fn infinite_value() -> Self;
+}
+impl InfiniteValue for f64 {
+    fn infinite_value() -> f64 {
+        0.0/0.0
+    }
+}
+impl InfiniteValue for FxS8 {
+    fn infinite_value() -> FxS8 {
+        127i8.into()
     }
 }
 pub trait One {
