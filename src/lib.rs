@@ -169,8 +169,8 @@ impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
 			std::mem::swap(&mut min,&mut max);
 		}
 
-		let mut unit_max = -T::max_value();
-		let mut unit_min = T::max_value();
+		let mut unit_max = max;
+		let mut unit_min = min;
 
 		let mut f = match source.model.units[1].1 {
 			Some(ref f) => f,
@@ -199,9 +199,9 @@ impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
 			}
 			for (u,&w) in next_min.iter_mut().zip(wl.iter()) {
 				let o = if w >= T::default() {
-					umin
-				} else {
 					umax
+				} else {
+					umin
 				};
 				*u += o * w;
 				unit_min = unit_min.min(u);
@@ -247,9 +247,9 @@ impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
 				}
 				for (u,&w) in next_min.iter_mut().zip(wl.iter()) {
 					let o = if w >= T::default() {
-						umin
-					} else {
 						umax
+					} else {
+						umin
 					};
 					*u += o * w;
 					unit_min = unit_min.min(u);
