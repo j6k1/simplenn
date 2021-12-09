@@ -165,7 +165,9 @@ impl One for FxS8 {
 impl Pow for FxS8 {
     #[inline]
     fn pow(&self,e:u32) -> FxS8 {
-        if e == 1 {
+        if e == 0 {
+            1.into()
+        } else if e == 1 {
             *self
         } else {
             let mut p = self.pow(e/2);

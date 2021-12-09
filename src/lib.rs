@@ -294,9 +294,7 @@ impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
 			units.push((*s,f.as_ref().map(|f| f.as_activate_function())));
 		}
 
-		dbg!(unit_min,unit_max);
 		let factor = unit_max.abs().max(&unit_min.abs()) / T::from(127i8);
-		dbg!(&factor);
 
 		let mut layers:Vec<Vec<Vec<FxS8>>> = Vec::new();
 
