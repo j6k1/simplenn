@@ -4,8 +4,6 @@ use std::fmt;
 use Bias;
 use std::fmt::Debug;
 
-const FIXED_I8_E:i8 = (2.71828182845904 * 8.) as i8;
-
 pub trait UnitValue<T>: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
                         AddAssign + PartialOrd +
                         Clone + Copy + Default + Debug + From<i8> + Send + Sync + 'static +
@@ -95,6 +93,11 @@ impl From<f64> for FxS8 {
         FxS8 {
             raw: source as i8
         }
+    }
+}
+impl From<FxS8> for f64 {
+    fn from(source:FxS8) -> f64 {
+        source.raw as f64 / 8.
     }
 }
 pub trait Max {
@@ -187,11 +190,10 @@ impl Exp for f64 {
         (*self).exp()
     }
 }
-impl Exp for FxS8 where FxS8: From<i8> {
+impl Exp for FxS8 where FxS8: From<i8>, f64: From<FxS8> {
     #[inline]
     fn exp(&self) -> FxS8 {
-        let e = FxS8::from(FIXED_I8_E);
-        e.pow(self.raw as u32)
+        ((2.71828182845904f64.powf((*self).into())) as f64).into()
     }
 }
 pub trait InitialMax {
