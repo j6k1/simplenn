@@ -51,7 +51,7 @@ impl Div for FxS8 {
     type Output = Self;
 
     fn div(self,other:FxS8) -> FxS8 {
-        ((self.raw << 3) / (other.raw)).into()
+        ((((self.raw as u8) << 3) & 0b01111111 | ((self.raw as u8) & 0b10000000)) as i8 / (other.raw)).into()
     }
 }
 impl Neg for FxS8 {
