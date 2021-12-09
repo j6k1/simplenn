@@ -221,7 +221,7 @@ impl Exp for f64 {
 impl Exp for FxS8 where FxS8: From<i8>, f64: From<FxS8> {
     #[inline]
     fn exp(&self) -> FxS8 {
-        ((2.71828182845904f64.powf((*self).into())) as f64).into()
+        f64::from(*self).exp().into()
     }
 }
 impl Tanh for f64 {
