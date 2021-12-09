@@ -161,7 +161,7 @@ pub struct Quantization<O,E> {
 }
 
 impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
-	pub fn quantization<T>(source:&NN<T,O,E>,mut max:T,mut min:T) ->
+	pub fn quantization<T>(source:&NN<T,O,E>,mut min:T,mut max:T) ->
 		Result<NN<FxS8,VoidOptimizer,VoidLossFunction>,InvalidStateError>
 		where T: UnitValue<T>,
 			  FxS8: UnitValue<FxS8> + From<T> + {
