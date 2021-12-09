@@ -14,21 +14,6 @@ pub trait UnitValue<T>: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Outp
 pub struct FxS8 {
     raw:i8
 }
-impl FxS8 {
-    pub fn new(integer:i8,decimal:i8) -> FxS8 {
-        let sign = integer >> 7;
-
-        if sign == 0 {
-            FxS8 {
-                raw: (integer & 0b1111) << 3 | (decimal & 0b111)
-            }
-        } else {
-            FxS8 {
-                raw: ((0 - integer as u8 & 0b1111) & 0b1111 << 3 | 0b10000000 | (decimal as u8 & 0b111)) as i8
-            }
-        }
-    }
-}
 impl From<i8> for FxS8 {
     fn from(raw:i8) -> FxS8 {
         FxS8 {
@@ -85,22 +70,7 @@ impl Default for FxS8 {
 }
 impl fmt::Display for FxS8 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let sign = self.raw >> 7;
-        let decimal = self.raw as u8 & 3;
-
-        if sign == 0 && decimal != 0 {
-            write!(f, "{}.{}",self.raw >> 3 & 0b1111,
-                   format!("{:0>3}",decimal).as_str().trim_end_matches("0")
-            )
-        } else if sign == 0 {
-            write!(f, "{}.0",self.raw >> 3 & 0b1111)
-        } else if sign == 1 && decimal != 0 {
-            write!(f, "{}.{}",((self.raw >> 3) as u8 & 0b10001111) as i8,
-                   format!("{:0>3}",(0 - decimal as u8) & 0b111).as_str().trim_end_matches("0")
-            )
-        } else {
-            write!(f, "{}.0",((self.raw >> 3) as u8 & 0b10001111) as i8,)
-        }
+        write!(f, "{}",self.raw)
     }
 }
 impl From<f64> for FxS8 {
