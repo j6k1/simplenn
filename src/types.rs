@@ -7,7 +7,7 @@ use std::fmt::Debug;
 pub trait UnitValue<T>: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
                         AddAssign + PartialOrd +
                         Clone + Copy + Default + Debug + From<i8> + Send + Sync + 'static +
-                        Exp + Tanh + InitialMax + One + Max + Min + MaxValue + Abs + Bias {
+                        Exp + Tanh + One + Max + Min + MaxValue + Abs + Bias {
 
 }
 #[derive(Debug,Clone,Copy,PartialOrd, PartialEq,Ord,Eq)]
@@ -19,7 +19,7 @@ impl FxS8 {
         let sign = integer >> 7;
 
         FxS8 {
-            raw:(integer & 0b1111) << 3 | sign | decimal & 0b111
+            raw:(integer & 0b1111) << 3 | sign | (decimal & 0b111)
         }
     }
 }
@@ -82,9 +82,9 @@ impl fmt::Display for FxS8 {
         let sign = self.raw >> 7;
 
         if sign == 0 {
-            write!(f, "{}.{}",self.raw >> 3 &0b1111 | sign, self.raw & 3)
+            write!(f, "{}.{:0>3}",self.raw >> 3 &0b1111 | sign, self.raw & 3)
         } else {
-            write!(f, "{}.{}",self.raw >> 3 &0b1111 | sign, 0 - self.raw & 3)
+            write!(f, "{}.{:0>3}",self.raw >> 3 &0b1111 | sign, (0 - self.raw) & 3)
         }
     }
 }
@@ -194,21 +194,6 @@ impl Exp for FxS8 where FxS8: From<i8>, f64: From<FxS8> {
     #[inline]
     fn exp(&self) -> FxS8 {
         ((2.71828182845904f64.powf((*self).into())) as f64).into()
-    }
-}
-pub trait InitialMax {
-    fn initial_max() -> Self;
-}
-impl InitialMax for f64 {
-    #[inline]
-    fn initial_max() -> f64 {
-        0.0/0.0
-    }
-}
-impl InitialMax for FxS8 {
-    #[inline]
-    fn initial_max() -> FxS8 {
-        FxS8::from(-128i8)
     }
 }
 impl Tanh for f64 {

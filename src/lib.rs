@@ -164,7 +164,7 @@ impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
 	pub fn quantization<T>(source:&NN<T,O,E>,mut max:T,mut min:T) ->
 		Result<NN<FxS8,VoidOptimizer,VoidLossFunction>,InvalidStateError>
 		where T: UnitValue<T>,
-			  FxS8: UnitValue<FxS8> + From<T> {
+			  FxS8: UnitValue<FxS8> + From<T> + {
 		if min > max {
 			std::mem::swap(&mut min,&mut max);
 		}
@@ -199,9 +199,9 @@ impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
 			}
 			for (u,&w) in next_min.iter_mut().zip(wl.iter()) {
 				let o = if w >= T::default() {
-					umax
-				} else {
 					umin
+				} else {
+					umax
 				};
 				*u += o * w;
 				unit_min = unit_min.min(u);
@@ -247,9 +247,9 @@ impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
 				}
 				for (u,&w) in next_min.iter_mut().zip(wl.iter()) {
 					let o = if w >= T::default() {
-						umax
-					} else {
 						umin
+					} else {
+						umax
 					};
 					*u += o * w;
 					unit_min = unit_min.min(u);
