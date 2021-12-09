@@ -161,10 +161,12 @@ pub struct Quantization<O,E> {
 }
 
 impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
-	pub fn quantization<T>(source:&NN<T,O,E>,mut min:T,mut max:T) ->
-		Result<NN<FxS8,VoidOptimizer,VoidLossFunction>,InvalidStateError>
+	pub fn quantization<T,R>(source:&NN<T,O,E>,mut min:T,mut max:T,
+		units_converter:fn (units:&Vec<(usize,Option<Box<dyn ActivateF<T>>>)>)
+							-> Vec<(usize,Option<Box<dyn ActivateF<R>>>)>) ->
+		Result<NN<R,VoidOptimizer,VoidLossFunction>,InvalidStateError>
 		where T: UnitValue<T>,
-			  FxS8: UnitValue<FxS8> + From<T> + {
+			  R: UnitValue<R> + From<T> + MaxRaw<T> {
 		if min > max {
 			std::mem::swap(&mut min,&mut max);
 		}
@@ -288,15 +290,11 @@ impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
 			input_min.push(T::one());
 		}
 
-		let mut units = Vec::new();
+		let units = units_converter(&source.model.units);
 
-		for (s,f) in source.model.units.iter() {
-			units.push((*s,f.as_ref().map(|f| f.as_activate_function())));
-		}
+		let factor = unit_max.abs().max(&unit_min.abs()) / R::max_raw();
 
-		let factor = unit_max.abs().max(&unit_min.abs()) / T::from(127i8);
-
-		let mut layers:Vec<Vec<Vec<FxS8>>> = Vec::new();
+		let mut layers:Vec<Vec<Vec<R>>> = Vec::new();
 
 		for i in 0..source.model.units.len()-1 {
 			layers.push(Vec::new());
@@ -323,6 +321,16 @@ impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
 			optimizer:VoidOptimizer,
 			lossf:Arc::new(VoidLossFunction),
 		})
+	}
+}
+pub struct UnitsConverter;
+impl UnitsConverter {
+	pub fn conv_to_fxs8<T>(units:&Vec<(usize,Option<Box<dyn ActivateF<T>>>)>)
+						   -> Vec<(usize,Option<Box<dyn ActivateF<FxS8>>>)>
+		where T: 'static {
+		units.iter().map(|(s,f)| {
+			(*s,f.as_ref().map(|f| f.as_activate_function()))
+		}).collect()
 	}
 }
 pub struct NNUnits<T> where T: UnitValue<T> {

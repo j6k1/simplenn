@@ -139,6 +139,14 @@ impl InitialMaxValue for FxS8 {
         (-128i8).into()
     }
 }
+pub trait MaxRaw<T> {
+    fn max_raw() -> T;
+}
+impl MaxRaw<f64> for FxS8 {
+    fn max_raw() -> f64 {
+        127i8.into()
+    }
+}
 pub trait One {
     fn one() -> Self;
 }
