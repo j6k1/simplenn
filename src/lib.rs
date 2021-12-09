@@ -169,8 +169,8 @@ impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
 			std::mem::swap(&mut min,&mut max);
 		}
 
-		let mut unit_max = T::max_value();
-		let mut unit_min = -T::max_value();
+		let mut unit_max = -T::max_value();
+		let mut unit_min = T::max_value();
 
 		let mut f = match source.model.units[1].1 {
 			Some(ref f) => f,
@@ -181,46 +181,54 @@ impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
 			}
 		};
 
+		let mut input_max = vec![unit_max;source.model.units[0].0];
+		let mut input_min = vec![unit_min;source.model.units[0].0];
+
 		let mut next_max = vec![T::default();source.model.units[1].0];
 		let mut next_min = vec![T::default();source.model.units[1].0];
 
-		for (_,wl) in (0..source.model.units[0].0).zip(source.model.layers[0].iter()) {
+		for ((&umax,&umin),wl) in input_max.iter().zip(input_min.iter()).zip(source.model.layers[0].iter()) {
 			for (u,&w) in next_max.iter_mut().zip(wl.iter()) {
 				let o = if w >= T::default() {
-					unit_max
+					umax
 				} else {
-					unit_min
+					umin
 				};
 				*u += o * w;
 				unit_max = unit_max.max(u);
 			}
 			for (u,&w) in next_min.iter_mut().zip(wl.iter()) {
 				let o = if w >= T::default() {
-					unit_min
+					umin
 				} else {
-					unit_max
+					umax
 				};
 				*u += o * w;
-				unit_max = unit_min.min(u);
+				unit_min = unit_min.min(u);
 			}
 		}
 
-		let mut input_max = vec![T::default();source.model.units[1].0];
+		input_max = next_max;
+		next_max = vec![T::default();source.model.units[1].0];
 
-		for (i,&ui) in input_max.iter_mut().zip(next_max.iter()) {
-			*i = f.apply(ui,&next_max);
-			unit_max = unit_max.max(i);
+		for (oi,&ui) in next_max.iter_mut().zip(input_max.iter()) {
+			*oi = f.apply(ui,&input_max);
+			unit_max = unit_max.max(&ui);
 		}
+
+		input_max = next_max;
 
 		input_max.push(T::one());
 
-		let mut input_min = vec![T::default();source.model.units[1].0];
+		input_min = next_min;
+		next_min = vec![T::default();source.model.units[1].0];
 
-		for (i,&ui) in input_min.iter_mut().zip(next_min.iter()) {
-			*i = f.apply(ui,&next_min);
-			unit_min = unit_min.min(i);
+		for (oi,&ui) in next_min.iter_mut().zip(input_min.iter()) {
+			*oi = f.apply(ui,&input_min);
+			unit_min = unit_min.min(&ui);
 		}
 
+		input_min = next_min;
 		input_min.push(T::one());
 
 		for l in 1..(source.model.units.len()-1) {
@@ -257,22 +265,26 @@ impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
 				}
 			};
 
-			input_max = vec![T::default();source.model.units[l+1].0];
+			input_max = next_max;
+			next_max = vec![T::default();source.model.units[l+1].0];
 
-			for (i,&ui) in input_max.iter_mut().zip(next_max.iter()) {
-				*i = f.apply(ui,&next_max);
-				unit_max = unit_max.max(i);
+			for (oi,&ui) in next_max.iter_mut().zip(input_max.iter()) {
+				*oi = f.apply(ui,&input_max);
+				unit_max = unit_max.max(&ui);
 			}
 
+			input_max = next_max;
 			input_max.push(T::one());
 
-			let mut input_min = vec![T::default();source.model.units[l+1].0];
+			input_min = next_min;
+			next_min = vec![T::default();source.model.units[l+1].0];
 
-			for (i,&ui) in input_min.iter_mut().zip(next_min.iter()) {
-				*i = f.apply(ui,&next_min);
-				unit_min = unit_min.min(i);
+			for (oi,&ui) in next_min.iter_mut().zip(input_min.iter()) {
+				*oi = f.apply(ui,&input_min);
+				unit_min = unit_min.min(&ui);
 			}
 
+			input_min = next_min;
 			input_min.push(T::one());
 		}
 
@@ -282,14 +294,16 @@ impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
 			units.push((*s,f.as_ref().map(|f| f.as_activate_function())));
 		}
 
-		let factor = unit_max.abs().max(&unit_min.abs());
+		dbg!(unit_min,unit_max);
+		let factor = unit_max.abs().max(&unit_min.abs()) / T::from(127i8);
+		dbg!(&factor);
 
 		let mut layers:Vec<Vec<Vec<FxS8>>> = Vec::new();
 
 		for i in 0..source.model.units.len()-1 {
 			layers.push(Vec::new());
 
-			for j in 0..source.model.units[i].0+1 {
+			for j in 0..source.model.units[i].0 {
 				layers[i].push(Vec::with_capacity(source.model.units[i].0+1));
 				layers[i].resize_with(source.model.units[i].0,Default::default);
 

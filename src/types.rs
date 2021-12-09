@@ -2,16 +2,17 @@ use std::convert::From;
 use std::ops::{Add, Mul, Sub, Div, AddAssign, Neg};
 use std::fmt;
 use Bias;
+use std::fmt::Debug;
 
 const FIXED_I8_E:i8 = (2.71828182845904 * 8.) as i8;
 
 pub trait UnitValue<T>: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
                         AddAssign + PartialOrd +
-                        Clone + Copy + Default + Send + Sync + 'static +
+                        Clone + Copy + Default + Debug + From<i8> + Send + Sync + 'static +
                         Exp + Tanh + InitialMax + One + Max + Min + MaxValue + Abs + Bias {
 
 }
-#[derive(Clone,Copy,PartialOrd, PartialEq,Ord,Eq)]
+#[derive(Debug,Clone,Copy,PartialOrd, PartialEq,Ord,Eq)]
 pub struct FxS8 {
     raw:i8
 }
