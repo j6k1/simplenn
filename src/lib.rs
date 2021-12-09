@@ -310,6 +310,7 @@ impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
 				}
 			}
 		}
+
 		let mut rnd = rand::thread_rng();
 		let mut rnd = XorShiftRng::from_seed(rnd.gen());
 

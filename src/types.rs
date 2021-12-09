@@ -7,7 +7,7 @@ use std::fmt::Debug;
 pub trait UnitValue<T>: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
                         AddAssign + PartialOrd +
                         Clone + Copy + Default + Debug + From<i8> + Send + Sync + 'static +
-                        Exp + Tanh + One + Max + Min + MaxValue + InfiniteValue + Abs + Bias {
+                        Exp + Tanh + One + Max + Min + MaxValue + InitialMaxValue + Abs + Bias {
 
 }
 #[derive(Debug,Clone,Copy,PartialOrd, PartialEq,Ord,Eq)]
@@ -18,8 +18,14 @@ impl FxS8 {
     pub fn new(integer:i8,decimal:i8) -> FxS8 {
         let sign = integer >> 7;
 
-        FxS8 {
-            raw:(integer & 0b1111) << 3 | sign | (decimal & 0b111)
+        if sign == 0 {
+            FxS8 {
+                raw: (integer & 0b1111) << 3 | (decimal & 0b111)
+            }
+        } else {
+            FxS8 {
+                raw: ((0 - integer as u8 & 0b1111) & 0b1111 << 3 | 0b10000000 | (decimal as u8 & 0b111)) as i8
+            }
         }
     }
 }
@@ -80,18 +86,27 @@ impl Default for FxS8 {
 impl fmt::Display for FxS8 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let sign = self.raw >> 7;
+        let decimal = self.raw as u8 & 3;
 
-        if sign == 0 {
-            write!(f, "{}.{:0>3}",self.raw >> 3 &0b1111 | sign, self.raw & 3)
+        if sign == 0 && decimal != 0 {
+            write!(f, "{}.{}",self.raw >> 3 & 0b1111,
+                   format!("{:0>3}",decimal).as_str().trim_end_matches("0")
+            )
+        } else if sign == 0 {
+            write!(f, "{}.0",self.raw >> 3 & 0b1111)
+        } else if sign == 1 && decimal != 0 {
+            write!(f, "{}.{}",((self.raw >> 3) as u8 & 0b10001111) as i8,
+                   format!("{:0>3}",(0 - decimal as u8) & 0b111).as_str().trim_end_matches("0")
+            )
         } else {
-            write!(f, "{}.{:0>3}",self.raw >> 3 &0b1111 | sign, (0 - self.raw) & 3)
+            write!(f, "{}.0",((self.raw >> 3) as u8 & 0b10001111) as i8,)
         }
     }
 }
 impl From<f64> for FxS8 {
     fn from(source:f64) -> FxS8 {
         FxS8 {
-            raw: source as i8
+            raw: (source * 8.) as i8
         }
     }
 }
@@ -141,17 +156,17 @@ impl MaxValue for FxS8 {
         }
     }
 }
-pub trait InfiniteValue {
-    fn infinite_value() -> Self;
+pub trait InitialMaxValue {
+    fn initial_max_value() -> Self;
 }
-impl InfiniteValue for f64 {
-    fn infinite_value() -> f64 {
+impl InitialMaxValue for f64 {
+    fn initial_max_value() -> f64 {
         0.0/0.0
     }
 }
-impl InfiniteValue for FxS8 {
-    fn infinite_value() -> FxS8 {
-        127i8.into()
+impl InitialMaxValue for FxS8 {
+    fn initial_max_value() -> FxS8 {
+        (-128i8).into()
     }
 }
 pub trait One {
