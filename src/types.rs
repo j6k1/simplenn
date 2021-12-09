@@ -59,14 +59,14 @@ impl Mul for FxS8 {
     type Output = Self;
 
     fn mul(self,other:FxS8) -> FxS8 {
-        (self.raw * other.raw >> 3).into()
+        ((self.raw * other.raw) >> 3).into()
     }
 }
 impl Div for FxS8 {
     type Output = Self;
 
     fn div(self,other:FxS8) -> FxS8 {
-        (self.raw << 3 / other.raw).into()
+        ((self.raw << 3) / other.raw).into()
     }
 }
 impl Neg for FxS8 {
