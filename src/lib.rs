@@ -180,138 +180,13 @@ pub struct Quantization<O,E> {
 }
 
 impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
-	pub fn quantization<T,R>(source:&NN<T,O,E>,mut min:T,mut max:T,
-		units_converter:fn (units:&Vec<(usize,Option<Box<dyn ActivateF<T>>>)>)
-							-> Vec<(usize,Option<Box<dyn ActivateF<R>>>)>) ->
-		Result<NN<R,VoidOptimizer,VoidLossFunction>,InvalidStateError>
+	pub fn quantization<T,R>(source:&NN<T,O,E>,
+							 units_converter:fn (units:&Vec<(usize,Option<Box<dyn ActivateF<T>>>)>)
+		-> Vec<(usize,Option<Box<dyn ActivateF<R>>>)>) ->
+																				   Result<NN<R,VoidOptimizer,VoidLossFunction>,InvalidStateError>
 		where T: UnitValue<T>,
 			  R: UnitValue<R> + From<T> + MaxRaw<T> {
-		if min > max {
-			std::mem::swap(&mut min,&mut max);
-		}
-
-		let mut unit_max = max;
-		let mut unit_min = min;
-
-		let mut f = match source.model.units[1].1 {
-			Some(ref f) => f,
-			None => {
-				return Err(InvalidStateError::InvalidInput(String::from(
-					"Reference to the activation function object is not set."
-				)));
-			}
-		};
-
-		let mut input_max = vec![unit_max;source.model.units[0].0];
-		let mut input_min = vec![unit_min;source.model.units[0].0];
-
-		let mut next_max = vec![T::default();source.model.units[1].0];
-		let mut next_min = vec![T::default();source.model.units[1].0];
-
-		for ((&umax,&umin),wl) in input_max.iter().zip(input_min.iter()).zip(source.model.layers[0].iter()) {
-			for (u,&w) in next_max.iter_mut().zip(wl.iter()) {
-				let o = if w >= T::default() {
-					umax
-				} else {
-					umin
-				};
-				*u += o * w;
-				unit_max = unit_max.max(u);
-			}
-			for (u,&w) in next_min.iter_mut().zip(wl.iter()) {
-				let o = if w >= T::default() {
-					umin
-				} else {
-					umax
-				};
-				*u += o * w;
-				unit_min = unit_min.min(u);
-			}
-		}
-
-		input_max = next_max;
-		next_max = vec![T::default();source.model.units[1].0];
-
-		for (oi,&ui) in next_max.iter_mut().zip(input_max.iter()) {
-			*oi = f.apply(ui,&input_max);
-			unit_max = unit_max.max(&ui);
-		}
-
-		input_max = next_max;
-
-		input_max.push(T::one());
-
-		input_min = next_min;
-		next_min = vec![T::default();source.model.units[1].0];
-
-		for (oi,&ui) in next_min.iter_mut().zip(input_min.iter()) {
-			*oi = f.apply(ui,&input_min);
-			unit_min = unit_min.min(&ui);
-		}
-
-		input_min = next_min;
-		input_min.push(T::one());
-
-		for l in 1..(source.model.units.len()-1) {
-			next_max = vec![T::default();source.model.units[l+1].0];
-			next_min = vec![T::default();source.model.units[l+1].0];
-
-			for ((&umax,&umin),wl) in input_max.iter().zip(input_min.iter()).zip(source.model.layers[l].iter()) {
-				for (u,&w) in next_max.iter_mut().zip(wl.iter()) {
-					let o = if w >= T::default() {
-						umax
-					} else {
-						umin
-					};
-					*u += o * w;
-					unit_max = unit_max.max(u);
-				}
-				for (u,&w) in next_min.iter_mut().zip(wl.iter()) {
-					let o = if w >= T::default() {
-						umin
-					} else {
-						umax
-					};
-					*u += o * w;
-					unit_min = unit_min.min(u);
-				}
-			}
-
-			f = match source.model.units[l+1].1 {
-				Some(ref f) => f,
-				None => {
-					return Err(InvalidStateError::InvalidInput(String::from(
-						"Reference to the activation function object is not set."
-					)));
-				}
-			};
-
-			input_max = next_max;
-			next_max = vec![T::default();source.model.units[l+1].0];
-
-			for (oi,&ui) in next_max.iter_mut().zip(input_max.iter()) {
-				*oi = f.apply(ui,&input_max);
-				unit_max = unit_max.max(&ui);
-			}
-
-			input_max = next_max;
-			input_max.push(T::one());
-
-			input_min = next_min;
-			next_min = vec![T::default();source.model.units[l+1].0];
-
-			for (oi,&ui) in next_min.iter_mut().zip(input_min.iter()) {
-				*oi = f.apply(ui,&input_min);
-				unit_min = unit_min.min(&ui);
-			}
-
-			input_min = next_min;
-			input_min.push(T::one());
-		}
-
 		let units = units_converter(&source.model.units);
-
-		let factor = unit_max.abs().max(&unit_min.abs()) / R::max_raw();
 
 		let mut layers:Vec<Vec<Vec<R>>> = Vec::new();
 
@@ -323,7 +198,7 @@ impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
 				layers[i].resize_with(source.model.units[i].0,Default::default);
 
 				for k in 0..source.model.units[i+1].0 {
-					layers[i][j].push((source.model.layers[i][j][k] / factor).into())
+					layers[i][j].push((source.model.layers[i][j][k]).into())
 				}
 			}
 		}
