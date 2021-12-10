@@ -347,13 +347,13 @@ impl Exp for f64 {
         (*self).exp()
     }
 }
-impl Exp for FxS8 where FxS8: From<i8>, f64: From<FxS8> {
+impl Exp for FxS8 where FxS8: From<f64>, f64: From<FxS8> {
     #[inline]
     fn exp(&self) -> FxS8 {
         f64::from(*self).exp().into()
     }
 }
-impl Exp for FxS16 where FxS16: From<i16>, f64: From<FxS16> {
+impl Exp for FxS16 where FxS16: From<f64>, f64: From<FxS16> {
     #[inline]
     fn exp(&self) -> FxS16 {
         f64::from(*self).exp().into()
