@@ -1,7 +1,10 @@
 use types::*;
 use std::marker::PhantomData;
 
-pub trait ActivateF<T>: AsActivateF<FxS8> + Send + Sync + 'static where T: UnitValue<T> {
+pub trait ActivateF<T>: AsActivateF<FxS8> + AsActivateF<FxS16> +
+	Send + Sync + 'static
+	where T: UnitValue<T> {
+
 	fn apply(&self,u:T,v:&[T]) -> T;
 	fn derive(&self,e:T) -> T;
 	fn kind(&self) -> &str;
@@ -39,6 +42,11 @@ impl<T> AsActivateF<FxS8> for FIdentity<T> where T: Send + Sync + 'static {
 		Box::new(FIdentity::new())
 	}
 }
+impl<T> AsActivateF<FxS16> for FIdentity<T> where T: Send + Sync + 'static {
+	fn as_activate_function(&self) -> Box<dyn ActivateF<FxS16>> {
+		Box::new(FIdentity::new())
+	}
+}
 #[derive(Clone)]
 pub struct FSigmoid<T> {
 	t:PhantomData::<T>
@@ -66,6 +74,11 @@ impl<T> ActivateF<T> for FSigmoid<T> where T: UnitValue<T> {
 }
 impl<T> AsActivateF<FxS8> for FSigmoid<T> where T: Send + Sync + 'static {
 	fn as_activate_function(&self) -> Box<dyn ActivateF<FxS8>> {
+		Box::new(FSigmoid::new())
+	}
+}
+impl<T> AsActivateF<FxS16> for FSigmoid<T> where T: Send + Sync + 'static {
+	fn as_activate_function(&self) -> Box<dyn ActivateF<FxS16>> {
 		Box::new(FSigmoid::new())
 	}
 }
@@ -108,6 +121,11 @@ impl<T> AsActivateF<FxS8> for FReLU<T> where T: Send + Sync + 'static {
 		Box::new(FReLU::new())
 	}
 }
+impl<T> AsActivateF<FxS16> for FReLU<T> where T: Send + Sync + 'static {
+	fn as_activate_function(&self) -> Box<dyn ActivateF<FxS16>> {
+		Box::new(FReLU::new())
+	}
+}
 #[derive(Clone)]
 pub struct FTanh<T> {
 	t:PhantomData::<T>
@@ -135,6 +153,11 @@ impl<T> ActivateF<T> for FTanh<T> where T: UnitValue<T> {
 }
 impl<T> AsActivateF<FxS8> for FTanh<T> where T: Send + Sync + 'static {
 	fn as_activate_function(&self) -> Box<dyn ActivateF<FxS8>> {
+		Box::new(FTanh::new())
+	}
+}
+impl<T> AsActivateF<FxS16> for FTanh<T> where T: Send + Sync + 'static {
+	fn as_activate_function(&self) -> Box<dyn ActivateF<FxS16>> {
 		Box::new(FTanh::new())
 	}
 }
@@ -166,6 +189,11 @@ impl<T> ActivateF<T> for FSoftMax<T> where T: UnitValue<T> {
 }
 impl<T> AsActivateF<FxS8> for FSoftMax<T> where T: Send + Sync + 'static {
 	fn as_activate_function(&self) -> Box<dyn ActivateF<FxS8>> {
+		Box::new(FSoftMax::new())
+	}
+}
+impl<T> AsActivateF<FxS16> for FSoftMax<T> where T: Send + Sync + 'static {
+	fn as_activate_function(&self) -> Box<dyn ActivateF<FxS16>> {
 		Box::new(FSoftMax::new())
 	}
 }

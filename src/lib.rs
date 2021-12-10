@@ -40,7 +40,13 @@ impl Bias for f64 {
 impl Bias for FxS8 {
 	#[inline]
 	fn bias() -> FxS8 {
-		8.into()
+		FxS8::one()
+	}
+}
+impl Bias for FxS16 {
+	#[inline]
+	fn bias() -> FxS16 {
+		FxS16::one()
 	}
 }
 pub struct NN<T,O,E> where T: UnitValue<T>, O: Optimizer, E: LossFunction {
@@ -152,6 +158,19 @@ impl<O,E> NN<FxS8,O,E> where FxS8: UnitValue<FxS8>, O: Optimizer, E: LossFunctio
 	}
 
 	pub fn solve_diff(&self, input: &[(usize, FxS8)], snapshot: &SnapShot<FxS8>) -> Result<SnapShot<FxS8>, InvalidStateError> {
+		self.model.solve_diff(input, snapshot)
+	}
+}
+impl<O,E> NN<FxS16,O,E> where FxS16: UnitValue<FxS16>, O: Optimizer, E: LossFunction {
+	pub fn solve(&self, input: &[FxS16]) -> Result<Vec<FxS16>, InvalidStateError> {
+		self.model.solve(input)
+	}
+
+	pub fn solve_shapshot(&self, input: &[FxS16]) -> Result<SnapShot<FxS16>, InvalidStateError> {
+		self.model.solve_shapshot(input)
+	}
+
+	pub fn solve_diff(&self, input: &[(usize, FxS16)], snapshot: &SnapShot<FxS16>) -> Result<SnapShot<FxS16>, InvalidStateError> {
 		self.model.solve_diff(input, snapshot)
 	}
 }
@@ -327,6 +346,14 @@ pub struct UnitsConverter;
 impl UnitsConverter {
 	pub fn conv_to_fxs8<T>(units:&Vec<(usize,Option<Box<dyn ActivateF<T>>>)>)
 						   -> Vec<(usize,Option<Box<dyn ActivateF<FxS8>>>)>
+		where T: 'static {
+		units.iter().map(|(s,f)| {
+			(*s,f.as_ref().map(|f| f.as_activate_function()))
+		}).collect()
+	}
+
+	pub fn conv_to_fxs16<T>(units:&Vec<(usize,Option<Box<dyn ActivateF<T>>>)>)
+						   -> Vec<(usize,Option<Box<dyn ActivateF<FxS16>>>)>
 		where T: 'static {
 		units.iter().map(|(s,f)| {
 			(*s,f.as_ref().map(|f| f.as_activate_function()))
@@ -1066,6 +1093,38 @@ impl NNModel<FxS8> {
 	#[allow(unused)]
 	fn apply_middle_and_out<F,R>(&self,o:Vec<Vec<FxS8>>,u:Vec<Vec<FxS8>>,after_callback:F) -> Result<R,InvalidStateError>
 		where F: Fn(Vec<FxS8>,Vec<Vec<FxS8>>,Vec<Vec<FxS8>>) -> Result<R,InvalidStateError> {
+
+		self.apply_middle_and_out_gneric(o,u,after_callback)
+	}
+}
+impl NNModel<FxS16> {
+	fn solve(&self,input:&[FxS16]) -> Result<Vec<FxS16>,InvalidStateError> {
+		self.solve_generic(input)
+	}
+
+	fn solve_diff(&self,input:&[(usize,FxS16)],s:&SnapShot<FxS16>) -> Result<SnapShot<FxS16>,InvalidStateError> {
+		self.solve_diff_generic(input,s)
+	}
+
+	fn solve_shapshot(&self,input:&[FxS16]) -> Result<SnapShot<FxS16>,InvalidStateError> {
+		self.solve_shapshot_generic(input)
+	}
+
+	pub fn apply<F,R>(&self,input:&[FxS16],after_callback:F) -> Result<R,InvalidStateError>
+		where F: Fn(Vec<FxS16>,Vec<Vec<FxS16>>,Vec<Vec<FxS16>>) -> Result<R,InvalidStateError> {
+
+		self.apply_generic(input, after_callback)
+	}
+
+	pub fn apply_diff<F,R>(&self,input:&[(usize,FxS16)],s:&SnapShot<FxS16>,after_callback:F) -> Result<R,InvalidStateError>
+		where F: Fn(Vec<FxS16>,Vec<Vec<FxS16>>,Vec<Vec<FxS16>>) -> Result<R,InvalidStateError> {
+
+		self.apply_diff_gneric(input,s,after_callback)
+	}
+
+	#[allow(unused)]
+	fn apply_middle_and_out<F,R>(&self,o:Vec<Vec<FxS16>>,u:Vec<Vec<FxS16>>,after_callback:F) -> Result<R,InvalidStateError>
+		where F: Fn(Vec<FxS16>,Vec<Vec<FxS16>>,Vec<Vec<FxS16>>) -> Result<R,InvalidStateError> {
 
 		self.apply_middle_and_out_gneric(o,u,after_callback)
 	}

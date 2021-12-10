@@ -85,6 +85,88 @@ impl From<FxS8> for f64 {
         source.raw as f64 / 8.
     }
 }
+#[derive(Debug,Clone,Copy,PartialOrd, PartialEq,Ord,Eq)]
+pub struct FxS16 {
+    raw:i16
+}
+impl From<i16> for FxS16 {
+    fn from(raw:i16) -> FxS16 {
+        FxS16 {
+            raw:raw
+        }
+    }
+}
+impl Add for FxS16 {
+    type Output = Self;
+
+    fn add(self,other:FxS16) -> FxS16 {
+        (self.raw + other.raw).into()
+    }
+}
+impl AddAssign for FxS16 {
+    fn add_assign(&mut self,other:FxS16) {
+        *self = *self + other;
+    }
+}
+impl Sub for FxS16 {
+    type Output = Self;
+
+    fn sub(self,other:FxS16) -> FxS16 {
+        (self.raw - other.raw).into()
+    }
+}
+impl Mul for FxS16 {
+    type Output = Self;
+
+    fn mul(self,other:FxS16) -> FxS16 {
+        ((self.raw * other.raw) >> 7).into()
+    }
+}
+impl Div for FxS16 {
+    type Output = Self;
+
+    fn div(self,other:FxS16) -> FxS16 {
+        ((((self.raw as i32) << 7) / (other.raw as i32)) as i16).into()
+    }
+}
+impl Neg for FxS16 {
+    type Output = Self;
+
+    fn neg(self) -> FxS16 {
+        FxS16 {
+            raw:-self.raw
+        }
+    }
+}
+impl Default for FxS16 {
+    fn default() -> FxS16 {
+        0i16.into()
+    }
+}
+impl fmt::Display for FxS16 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}",self.raw)
+    }
+}
+impl From<f64> for FxS16 {
+    fn from(source:f64) -> FxS16 {
+        FxS16 {
+            raw: (source * 128.) as i16
+        }
+    }
+}
+impl From<FxS16> for f64 {
+    fn from(source:FxS16) -> f64 {
+        source.raw as f64 / 128.
+    }
+}
+impl From<i8> for FxS16 {
+    fn from(source:i8) -> FxS16 {
+        FxS16 {
+            raw: source as i16
+        }
+    }
+}
 pub trait Max {
     fn max(&self,other:&Self) -> Self;
 }
@@ -98,6 +180,11 @@ impl Max for FxS8 {
         self.raw.max(other.raw).into()
     }
 }
+impl Max for FxS16 {
+    fn max(&self,other:&FxS16) -> FxS16 {
+        self.raw.max(other.raw).into()
+    }
+}
 pub trait Min {
     fn min(&self,other:&Self) -> Self;
 }
@@ -108,6 +195,11 @@ impl Min for f64 {
 }
 impl Min for FxS8 {
     fn min(&self,other:&FxS8) -> FxS8 {
+        self.raw.min(other.raw).into()
+    }
+}
+impl Min for FxS16 {
+    fn min(&self,other:&FxS16) -> FxS16 {
         self.raw.min(other.raw).into()
     }
 }
@@ -126,6 +218,13 @@ impl MaxValue for FxS8 {
         }
     }
 }
+impl MaxValue for FxS16 {
+    fn max_value() -> FxS16 {
+        FxS16 {
+            raw:i16::MAX
+        }
+    }
+}
 pub trait InitialMaxValue {
     fn initial_max_value() -> Self;
 }
@@ -139,12 +238,22 @@ impl InitialMaxValue for FxS8 {
         (-128i8).into()
     }
 }
+impl InitialMaxValue for FxS16 {
+    fn initial_max_value() -> FxS16 {
+        (i16::MIN).into()
+    }
+}
 pub trait MaxRaw<T> {
     fn max_raw() -> T;
 }
 impl MaxRaw<f64> for FxS8 {
     fn max_raw() -> f64 {
         127i8.into()
+    }
+}
+impl MaxRaw<f64> for FxS16 {
+    fn max_raw() -> f64 {
+        i16::MAX.into()
     }
 }
 pub trait One {
@@ -169,6 +278,12 @@ impl One for FxS8 {
     #[inline]
     fn one() -> FxS8 {
         8i8.into()
+    }
+}
+impl One for FxS16 {
+    #[inline]
+    fn one() -> FxS16 {
+        128i16.into()
     }
 }
 impl Pow for FxS8 {
@@ -202,6 +317,12 @@ impl Exp for FxS8 where FxS8: From<i8>, f64: From<FxS8> {
         f64::from(*self).exp().into()
     }
 }
+impl Exp for FxS16 where FxS16: From<i16>, f64: From<FxS16> {
+    #[inline]
+    fn exp(&self) -> FxS16 {
+        f64::from(*self).exp().into()
+    }
+}
 impl Tanh for f64 {
     #[inline]
     fn tanh(&self) -> f64 {
@@ -212,6 +333,12 @@ impl Tanh for FxS8 where FxS8: Exp + One {
     #[inline]
     fn tanh(&self) -> FxS8 {
         (FxS8::one() - self.exp()) / (FxS8::one() + self.exp())
+    }
+}
+impl Tanh for FxS16 where FxS16: Exp + One {
+    #[inline]
+    fn tanh(&self) -> FxS16 {
+        (FxS16::one() - self.exp()) / (FxS16::one() + self.exp())
     }
 }
 pub trait Abs {
@@ -231,5 +358,15 @@ impl Abs for FxS8 {
         }
     }
 }
+impl Abs for FxS16 {
+    fn abs(&self) -> FxS16 {
+        if self.raw < 0 {
+            -(*self)
+        } else {
+            *self
+        }
+    }
+}
 impl UnitValue<f64> for f64 {}
 impl UnitValue<FxS8> for FxS8 {}
+impl UnitValue<FxS16> for FxS16 {}
