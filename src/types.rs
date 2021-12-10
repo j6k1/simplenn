@@ -79,7 +79,7 @@ impl Default for FxS8 {
 impl fmt::Display for FxS8 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}",self.raw)
+        write!(f, "{}",(((self.raw as i16) << 3) as f32) / 8f32)
     }
 }
 impl From<f64> for FxS8 {
@@ -165,7 +165,7 @@ impl Default for FxS16 {
 impl fmt::Display for FxS16 {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}",self.raw)
+        write!(f, "{}", (((self.raw as i32) << 7) as f64) / 128f64)
     }
 }
 impl From<f64> for FxS16 {
