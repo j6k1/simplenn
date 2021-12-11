@@ -1115,7 +1115,7 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 
 		o[1][0] = T::bias();
 
-		for (oi,&ui) in o[1].iter_mut().zip(u[1].iter()) {
+		for (oi,&ui) in o[1].iter_mut().skip(1).zip(u[1].iter().skip(1)) {
 			*oi = f.apply(ui,&u[1]);
 		}
 

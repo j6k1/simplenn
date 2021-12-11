@@ -287,7 +287,7 @@ fn test_fizzbuzz() {
 	const BUZZ:[f64; 4] = [0f64,0f64,1f64,0f64];
 	const OTHER:[f64; 4] = [0f64,0f64,0f64,1f64];
 
-	for _ in 0..50 {
+	for _ in 0..200 {
 		for v in 101..256 {
 			let i = bits_to_vec(v);
 
@@ -480,7 +480,7 @@ fn test_relu_and_rmsprop() {
 	let mut v:Vec<([f64; 2],[f64; 1])> = Vec::new();
 	v.extend(&pairs);
 
-	for _ in 0..20000 {
+	for _ in 0..40000 {
 		for ii in 0..4 {
 			let mut i = Vec::new();
 			i.extend(&pairs[ii].0);
