@@ -1223,23 +1223,18 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 
 		o.push(oi);
 
-		let ui = s.u[1].clone();
+		let mut ui = s.u[1].clone();
 
 		for &(i,d) in input {
 			// インデックス0はバイアスのユニットなので一つ右にずらす
-			let u = &mut u[1];
-			let wl = &self.layers[0][i];
-
-			for i in (0..wl.len()).step_by(16) {
-				for j in 0..16 {
-					u[i+j+1] += d * wl[i+j];
-				}
+			for (u,&w) in ui.iter_mut().skip(1).zip(&self.layers[0][i+1]) {
+				*u += d * w;
 			}
 		}
 
 		u.push(ui);
 
-		self.apply_middle_and_out_generic(o, u, after_callback)
+		self.apply_middle_and_out_simd(o, u, after_callback)
 	}
 
 	fn apply_middle_and_out_simd<F,R>(&self,mut o:Vec<Vec<T>>,mut u:Vec<Vec<T>>,after_callback:F) -> Result<R,InvalidStateError>
