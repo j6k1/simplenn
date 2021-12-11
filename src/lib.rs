@@ -200,6 +200,10 @@ impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
 				for k in 0..source.model.units[i+1].0 {
 					layers[i][j].push((source.model.layers[i][j][k]).into())
 				}
+
+				while layers[i][j].len() % 16 != 0 {
+					layers[i][j].push(R::default());
+				}
 			}
 		}
 
@@ -443,14 +447,14 @@ impl NNModel<f64> where f64: UnitValue<f64> {
 	pub fn apply_diff<F,R>(&self,input:&[(usize,f64)],s:&SnapShot<f64>,after_callback:F) -> Result<R,InvalidStateError>
 		where F: Fn(Vec<f64>,Vec<Vec<f64>>,Vec<Vec<f64>>) -> Result<R,InvalidStateError> {
 
-		self.apply_diff_gneric(input,s,after_callback)
+		self.apply_diff_generic(input,s,after_callback)
 	}
 
 	#[allow(unused)]
 	fn apply_middle_and_out<F,R>(&self,o:Vec<Vec<f64>>,u:Vec<Vec<f64>>,after_callback:F) -> Result<R,InvalidStateError>
 		where F: Fn(Vec<f64>,Vec<Vec<f64>>,Vec<Vec<f64>>) -> Result<R,InvalidStateError> {
 
-		self.apply_middle_and_out_gneric(o,u,after_callback)
+		self.apply_middle_and_out_generic(o, u, after_callback)
 	}
 
 	fn latter_part_of_learning<O,E>(&mut self, t:&[f64],s:&SnapShot<f64>,optimizer:&mut O,lossf:&E) ->
@@ -942,66 +946,66 @@ impl NNModel<f64> where f64: UnitValue<f64> {
 }
 impl NNModel<FxS8> {
 	fn solve(&self,input:&[FxS8]) -> Result<Vec<FxS8>,InvalidStateError> {
-		self.solve_generic(input)
+		self.solve_simd(input)
 	}
 
 	fn solve_diff(&self,input:&[(usize,FxS8)],s:&SnapShot<FxS8>) -> Result<SnapShot<FxS8>,InvalidStateError> {
-		self.solve_diff_generic(input,s)
+		self.solve_diff_simd(input,s)
 	}
 
 	fn solve_shapshot(&self,input:&[FxS8]) -> Result<SnapShot<FxS8>,InvalidStateError> {
-		self.solve_shapshot_generic(input)
+		self.solve_shapshot_simd(input)
 	}
 
 	pub fn apply<F,R>(&self,input:&[FxS8],after_callback:F) -> Result<R,InvalidStateError>
 		where F: Fn(Vec<FxS8>,Vec<Vec<FxS8>>,Vec<Vec<FxS8>>) -> Result<R,InvalidStateError> {
 
-		self.apply_generic(input, after_callback)
+		self.apply_simd(input, after_callback)
 	}
 
 	pub fn apply_diff<F,R>(&self,input:&[(usize,FxS8)],s:&SnapShot<FxS8>,after_callback:F) -> Result<R,InvalidStateError>
 		where F: Fn(Vec<FxS8>,Vec<Vec<FxS8>>,Vec<Vec<FxS8>>) -> Result<R,InvalidStateError> {
 
-		self.apply_diff_gneric(input,s,after_callback)
+		self.apply_diff_simd(input,s,after_callback)
 	}
 
 	#[allow(unused)]
 	fn apply_middle_and_out<F,R>(&self,o:Vec<Vec<FxS8>>,u:Vec<Vec<FxS8>>,after_callback:F) -> Result<R,InvalidStateError>
 		where F: Fn(Vec<FxS8>,Vec<Vec<FxS8>>,Vec<Vec<FxS8>>) -> Result<R,InvalidStateError> {
 
-		self.apply_middle_and_out_gneric(o,u,after_callback)
+		self.apply_middle_and_out_simd(o,u,after_callback)
 	}
 }
 impl NNModel<FxS16> {
 	fn solve(&self,input:&[FxS16]) -> Result<Vec<FxS16>,InvalidStateError> {
-		self.solve_generic(input)
+		self.solve_simd(input)
 	}
 
 	fn solve_diff(&self,input:&[(usize,FxS16)],s:&SnapShot<FxS16>) -> Result<SnapShot<FxS16>,InvalidStateError> {
-		self.solve_diff_generic(input,s)
+		self.solve_diff_simd(input,s)
 	}
 
 	fn solve_shapshot(&self,input:&[FxS16]) -> Result<SnapShot<FxS16>,InvalidStateError> {
-		self.solve_shapshot_generic(input)
+		self.solve_shapshot_simd(input)
 	}
 
 	pub fn apply<F,R>(&self,input:&[FxS16],after_callback:F) -> Result<R,InvalidStateError>
 		where F: Fn(Vec<FxS16>,Vec<Vec<FxS16>>,Vec<Vec<FxS16>>) -> Result<R,InvalidStateError> {
 
-		self.apply_generic(input, after_callback)
+		self.apply_simd(input, after_callback)
 	}
 
 	pub fn apply_diff<F,R>(&self,input:&[(usize,FxS16)],s:&SnapShot<FxS16>,after_callback:F) -> Result<R,InvalidStateError>
 		where F: Fn(Vec<FxS16>,Vec<Vec<FxS16>>,Vec<Vec<FxS16>>) -> Result<R,InvalidStateError> {
 
-		self.apply_diff_gneric(input,s,after_callback)
+		self.apply_diff_simd(input,s,after_callback)
 	}
 
 	#[allow(unused)]
 	fn apply_middle_and_out<F,R>(&self,o:Vec<Vec<FxS16>>,u:Vec<Vec<FxS16>>,after_callback:F) -> Result<R,InvalidStateError>
 		where F: Fn(Vec<FxS16>,Vec<Vec<FxS16>>,Vec<Vec<FxS16>>) -> Result<R,InvalidStateError> {
 
-		self.apply_middle_and_out_gneric(o,u,after_callback)
+		self.apply_middle_and_out_simd(o,u,after_callback)
 	}
 }
 impl<T> NNModel<T> where T: UnitValue<T> {
@@ -1010,11 +1014,23 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 	}
 
 	fn solve_diff_generic(&self,input:&[(usize,T)],s:&SnapShot<T>) -> Result<SnapShot<T>,InvalidStateError> {
-		self.apply_diff_gneric(input,s,|r,o,u| Ok(SnapShot::new(r,o,u,None)))
+		self.apply_diff_generic(input,s,|r,o,u| Ok(SnapShot::new(r,o,u,None)))
 	}
 
 	fn solve_shapshot_generic(&self,input:&[T]) -> Result<SnapShot<T>,InvalidStateError> {
 		self.apply_generic(input, |r, o, u| Ok(SnapShot::new(r, o, u, None)))
+	}
+
+	fn solve_simd(&self,input:&[T]) -> Result<Vec<T>,InvalidStateError> {
+		self.apply_simd(input, |r, _, _| Ok(r))
+	}
+
+	fn solve_diff_simd(&self,input:&[(usize,T)],s:&SnapShot<T>) -> Result<SnapShot<T>,InvalidStateError> {
+		self.apply_diff_simd(input,s,|r,o,u| Ok(SnapShot::new(r,o,u,None)))
+	}
+
+	fn solve_shapshot_simd(&self,input:&[T]) -> Result<SnapShot<T>,InvalidStateError> {
+		self.apply_simd(input, |r, o, u| Ok(SnapShot::new(r, o, u, None)))
 	}
 
 	fn apply_generic<F,R>(&self, input:&[T], after_callback:F) -> Result<R,InvalidStateError>
@@ -1049,10 +1065,10 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 			}
 		}
 
-		self.apply_middle_and_out_gneric(o,u,after_callback)
+		self.apply_middle_and_out_generic(o, u, after_callback)
 	}
 
-	fn apply_diff_gneric<F,R>(&self,input:&[(usize,T)],s:&SnapShot<T>,after_callback:F) -> Result<R,InvalidStateError>
+	fn apply_diff_generic<F,R>(&self,input:&[(usize,T)],s:&SnapShot<T>,after_callback:F) -> Result<R,InvalidStateError>
 		where F: Fn(Vec<T>,Vec<Vec<T>>,Vec<Vec<T>>) -> Result<R,InvalidStateError> {
 		let mut o:Vec<Vec<T>> = Vec::with_capacity(self.units.len());
 		let mut u:Vec<Vec<T>> = Vec::with_capacity(self.units.len());
@@ -1072,17 +1088,17 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 
 		for &(i,d) in input {
 			// インデックス0はバイアスのユニットなので一つ右にずらす
-			for (u,&w) in ui.iter_mut().skip(1).zip(&self.layers[0][i+1]) {
+			for (u,&w) in ui.iter_mut().skip(1).zip(&self.layers[0][i]) {
 				*u += d * w;
 			}
 		}
 
 		u.push(ui);
 
-		self.apply_middle_and_out_gneric(o,u,after_callback)
+		self.apply_middle_and_out_generic(o, u, after_callback)
 	}
 
-	fn apply_middle_and_out_gneric<F,R>(&self,mut o:Vec<Vec<T>>,mut u:Vec<Vec<T>>,after_callback:F) -> Result<R,InvalidStateError>
+	fn apply_middle_and_out_generic<F,R>(&self, mut o:Vec<Vec<T>>, mut u:Vec<Vec<T>>, after_callback:F) -> Result<R,InvalidStateError>
 		where F: Fn(Vec<T>,Vec<Vec<T>>,Vec<Vec<T>>) -> Result<R,InvalidStateError> {
 		o.push(Vec::with_capacity(self.units[1].0 + 1));
 		o[1].resize_with(self.units[1].0 + 1, Default::default);
@@ -1131,6 +1147,163 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 			let u = &u[ll];
 
 			for (o,ui) in o[ll].iter_mut().skip(1).zip(u.iter().skip(1)) {
+				*o = f.apply(*ui,u);
+			}
+		}
+
+		let mut r:Vec<T> = Vec::with_capacity(self.units[self.units.len()-1].0);
+
+		for &oi in o[self.units.len()-1].iter().skip(1) {
+			r.push(oi);
+		}
+
+		after_callback(r,o,u)
+	}
+
+	fn apply_simd<F,R>(&self, input:&[T], after_callback:F) -> Result<R,InvalidStateError>
+		where F: Fn(Vec<T>,Vec<Vec<T>>,Vec<Vec<T>>) -> Result<R,InvalidStateError> {
+		if input.len() != self.units[0].0 {
+			return Err(InvalidStateError::InvalidInput(String::from(
+				"The inputs to the input layer is invalid (the count of inputs must be the count of units)")));
+		}
+
+		let mut o:Vec<Vec<T>> = Vec::with_capacity(self.units.len());
+		let mut u:Vec<Vec<T>> = Vec::with_capacity(self.units.len());
+
+		u.push(Vec::new());
+
+		let mut oi:Vec<T> = Vec::with_capacity(self.units[0].0 + 1);
+
+		oi.push(T::bias());
+
+		for i in input {
+			oi.push(*i);
+		}
+
+		o.push(oi);
+
+		let unit_len = if (self.units[1].0) % 16 == 0 {
+			self.units[1].0 + 1
+		} else {
+			(self.units[1].0 / 16 + 1) * 16 + 1
+		};
+
+		u.push(Vec::with_capacity(unit_len));
+
+		u[1].resize_with(unit_len, Default::default);
+
+		for (&o,wl) in o[0].iter().zip(&self.layers[0]) {
+			let u = &mut u[1];
+
+			for i in (0..wl.len()).step_by(16) {
+				for j in 0..16 {
+					unsafe {
+						*u.get_unchecked_mut(i + j + 1) += o * (*wl.get_unchecked(i + j));
+					}
+				}
+			}
+		}
+
+		self.apply_middle_and_out_simd(o,u,after_callback)
+	}
+
+	fn apply_diff_simd<F,R>(&self,input:&[(usize,T)],s:&SnapShot<T>,after_callback:F) -> Result<R,InvalidStateError>
+		where F: Fn(Vec<T>,Vec<Vec<T>>,Vec<Vec<T>>) -> Result<R,InvalidStateError> {
+		let mut o:Vec<Vec<T>> = Vec::with_capacity(self.units.len());
+		let mut u:Vec<Vec<T>> = Vec::with_capacity(self.units.len());
+
+		u.push(s.u[0].clone());
+
+		let mut oi:Vec<T> = s.o[0].clone();
+
+		for &(i,d) in input {
+			// インデックス0はバイアスのユニットなので一つ右にずらす
+			oi[i+1] += d;
+		}
+
+		o.push(oi);
+
+		let ui = s.u[1].clone();
+
+		for &(i,d) in input {
+			// インデックス0はバイアスのユニットなので一つ右にずらす
+			let u = &mut u[1];
+			let wl = &self.layers[0][i];
+
+			for i in (0..wl.len()).step_by(16) {
+				for j in 0..16 {
+					u[i+j+1] += d * wl[i+j];
+				}
+			}
+		}
+
+		u.push(ui);
+
+		self.apply_middle_and_out_generic(o, u, after_callback)
+	}
+
+	fn apply_middle_and_out_simd<F,R>(&self,mut o:Vec<Vec<T>>,mut u:Vec<Vec<T>>,after_callback:F) -> Result<R,InvalidStateError>
+		where F: Fn(Vec<T>,Vec<Vec<T>>,Vec<Vec<T>>) -> Result<R,InvalidStateError> {
+		o.push(Vec::with_capacity(self.units[1].0 + 1));
+		o[1].resize_with(self.units[1].0 + 1, Default::default);
+
+		let f:&Box<dyn ActivateF<T>> = match self.units[1].1 {
+			Some(ref f) => f,
+			None => {
+				return Err(InvalidStateError::InvalidInput(String::from(
+					"Reference to the activation function object is not set."
+				)));
+			}
+		};
+
+		o[1][0] = T::bias();
+
+		for (oi,&ui) in o[1].iter_mut().zip(u[1].iter().take(self.units[1].0 + 1)) {
+			*oi = f.apply(ui,&u[1]);
+		}
+
+		for l in 1..self.units.len() - 1 {
+			let ll = l + 1;
+
+			let unit_len = if (self.units[ll].0) % 16 == 0 {
+				self.units[ll].0 + 1
+			} else {
+				(self.units[ll].0 / 16 + 1) * 16 + 1
+			};
+
+			let mut ul:Vec<T> = Vec::with_capacity(unit_len);
+			ul.resize_with(unit_len, Default::default);
+			u.push(ul);
+			let f:&Box<dyn ActivateF<T>> = match self.units[ll].1 {
+				Some(ref f) => f,
+				None => {
+					return Err(InvalidStateError::InvalidInput(String::from(
+						"Reference to the activation function object is not set."
+					)));
+				}
+			};
+
+			let mut ol:Vec<T> = Vec::with_capacity(self.units[ll].0 + 1);
+			ol.resize_with(self.units[ll].0 + 1, Default::default);
+			o.push(ol);
+
+			o[ll][0] = T::bias();
+
+			for (&o,wl) in o[l].iter().zip(&self.layers[l]) {
+				let u = &mut u[ll];
+
+				for i in (0..wl.len()).step_by(16) {
+					for j in 0..16 {
+						unsafe {
+							*u.get_unchecked_mut(i + j + 1) += o * (*wl.get_unchecked(i + j));
+						}
+					}
+				}
+			}
+
+			let u = &u[ll];
+
+			for (o,ui) in o[ll].iter_mut().zip(u.iter().skip(1).take(self.units[ll].0 + 1)) {
 				*o = f.apply(*ui,u);
 			}
 		}
