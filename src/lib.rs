@@ -1089,7 +1089,7 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 
 		for &(i,d) in input {
 			// インデックス0はバイアスのユニットなので一つ右にずらす
-			for (u,&w) in ui.iter_mut().skip(1).zip(&self.layers[0][i]) {
+			for (u,&w) in ui.iter_mut().skip(1).zip(&self.layers[0][i+1]) {
 				*u += d * w;
 			}
 		}
