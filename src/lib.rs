@@ -1115,6 +1115,7 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 
 		o[1][0] = T::bias();
 
+		// インデックス0はバイアスのユニットなので一つ右にずらす
 		for (oi,&ui) in o[1].iter_mut().skip(1).zip(u[1].iter().skip(1)) {
 			*oi = f.apply(ui,&u[1]);
 		}
@@ -1258,7 +1259,10 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 		o[1][0] = T::bias();
 
 		for (oi,&ui) in o[1].iter_mut()
-										.zip(u[1].iter().take(self.units[1].0 + 1)) {
+										.skip(1)
+										.zip(u[1].iter()
+													.skip(1)
+													.take(self.units[1].0)) {
 			*oi = f.apply(ui,&u[1]);
 		}
 
@@ -1308,7 +1312,7 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 												.skip(1)
 												.zip(u.iter()
 													.skip(1)
-													.take(self.units[ll].0 + 1)) {
+													.take(self.units[ll].0)) {
 				// インデックス0はバイアスのユニットなので一つ右にずらす
 				*o = f.apply(*ui,u);
 			}
