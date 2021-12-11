@@ -185,7 +185,7 @@ impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
 		-> Vec<(usize,Option<Box<dyn ActivateF<R>>>)>) ->
 																				   Result<NN<R,VoidOptimizer,VoidLossFunction>,InvalidStateError>
 		where T: UnitValue<T>,
-			  R: UnitValue<R> + From<T> + MaxRaw<T> {
+			  R: UnitValue<R> + From<T> {
 		let units = units_converter(&source.model.units);
 
 		let mut layers:Vec<Vec<Vec<R>>> = Vec::new();

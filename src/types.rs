@@ -277,21 +277,6 @@ impl InitialMaxValue for FxS16 {
         (i16::MIN).into()
     }
 }
-pub trait MaxRaw<T> {
-    fn max_raw() -> T;
-}
-impl MaxRaw<f64> for FxS8 {
-    #[inline]
-    fn max_raw() -> f64 {
-        127i8.into()
-    }
-}
-impl MaxRaw<f64> for FxS16 {
-    #[inline]
-    fn max_raw() -> f64 {
-        i16::MAX.into()
-    }
-}
 pub trait One {
     fn one() -> Self;
 }
