@@ -1060,6 +1060,7 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 		u[1].resize_with(self.units[1].0 + 1, Default::default);
 
 		for (&o,wl) in o[0].iter().zip(&self.layers[0]) {
+			// インデックス0はバイアスのユニットなので一つ右にずらす
 			for (u,&w) in u[1].iter_mut().skip(1).zip(wl) {
 				*u += o * w;
 			}
@@ -1114,7 +1115,8 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 
 		o[1][0] = T::bias();
 
-		for (oi,&ui) in o[1].iter_mut().zip(u[1].iter()) {
+		for (oi,&ui) in o[1].iter_mut().skip(1).zip(u[1].iter().skip(1)) {
+			// インデックス0はバイアスのユニットなので一つ右にずらす
 			*oi = f.apply(ui,&u[1]);
 		}
 
@@ -1139,6 +1141,7 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 			o[ll][0] = T::bias();
 
 			for (&o,wl) in o[l].iter().zip(&self.layers[l]) {
+				// インデックス0はバイアスのユニットなので一つ右にずらす
 				for (u,&w) in u[ll].iter_mut().skip(1).zip(wl) {
 					*u = *u + o * w;
 				}
@@ -1146,6 +1149,7 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 
 			let u = &u[ll];
 
+			// インデックス0はバイアスのユニットなので一つ右にずらす
 			for (o,ui) in o[ll].iter_mut().skip(1).zip(u.iter().skip(1)) {
 				*o = f.apply(*ui,u);
 			}
@@ -1198,6 +1202,7 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 			for i in (0..wl.len()).step_by(16) {
 				for j in 0..16 {
 					unsafe {
+						// インデックス0はバイアスのユニットなので一つ右にずらす
 						*u.get_unchecked_mut(i + j + 1) += o * (*wl.get_unchecked(i + j));
 					}
 				}
@@ -1253,7 +1258,11 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 
 		o[1][0] = T::bias();
 
-		for (oi,&ui) in o[1].iter_mut().zip(u[1].iter().take(self.units[1].0 + 1)) {
+		for (oi,&ui) in o[1].iter_mut()
+										.skip(1)
+										.zip(u[1].iter()
+											.skip(1).take(self.units[1].0 + 1)) {
+			// インデックス0はバイアスのユニットなので一つ右にずらす
 			*oi = f.apply(ui,&u[1]);
 		}
 
@@ -1290,6 +1299,7 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 				for i in (0..wl.len()).step_by(16) {
 					for j in 0..16 {
 						unsafe {
+							// インデックス0はバイアスのユニットなので一つ右にずらす
 							*u.get_unchecked_mut(i + j + 1) += o * (*wl.get_unchecked(i + j));
 						}
 					}
@@ -1298,7 +1308,12 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 
 			let u = &u[ll];
 
-			for (o,ui) in o[ll].iter_mut().zip(u.iter().skip(1).take(self.units[ll].0 + 1)) {
+			for (o,ui) in o[ll].iter_mut()
+												.skip(1)
+												.zip(u.iter()
+													.skip(1)
+													.take(self.units[ll].0 + 1)) {
+				// インデックス0はバイアスのユニットなので一つ右にずらす
 				*o = f.apply(*ui,u);
 			}
 		}
