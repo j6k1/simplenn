@@ -193,9 +193,9 @@ impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
 		for i in 0..source.model.units.len()-1 {
 			layers.push(Vec::new());
 
-			for j in 0..source.model.units[i].0 {
+			for j in 0..source.model.units[i].0 + 1 {
 				layers[i].push(Vec::with_capacity(source.model.units[i].0+1));
-				layers[i].resize_with(source.model.units[i].0,Default::default);
+				layers[i].resize_with(source.model.units[i].0 + 1,Default::default);
 
 				for k in 0..source.model.units[i+1].0 {
 					layers[i][j].push((source.model.layers[i][j][k]).into())

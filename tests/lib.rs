@@ -18,6 +18,7 @@ use simplenn::persistence::*;
 use simplenn::error::StartupError;
 use simplenn::error::ConfigReadError;
 use simplenn::error::InvalidStateError;
+use simplenn::types::*;
 
 fn bits_to_vec(value:u32) -> Vec<f64> {
 	let mut v = Vec::new();
@@ -29,6 +30,22 @@ fn bits_to_vec(value:u32) -> Vec<f64> {
 
 	while value > 0 {
 		v[index] = (value & 1) as f64;
+		value = value >> 1;
+		index += 1;
+	}
+
+	v
+}
+fn bits_to_vec_fx16(value:u32) -> Vec<FxS16> {
+	let mut v:Vec<FxS16> = Vec::new();
+	v.resize(8, 0i16.into());
+
+	let mut index = 0;
+
+	let mut value = value;
+
+	while value > 0 {
+		v[index] = ((value << 3) as i16).into();
 		value = value >> 1;
 		index += 1;
 	}
@@ -874,5 +891,72 @@ fn test_learn_batch_parallel_multiple_batches_per_thread() {
 		//println!("{:?}",&i);
 		//println!("{:?}",nnanswer);
 		assert!(validator(&nnanswer));
+	}
+}
+#[test]
+fn test_fizzbuzz_quantization_16bit() {
+	let mut rnd = rand::thread_rng();
+	let mut rnd = XorShiftRng::from_seed(rnd.gen());
+	let n = Normal::new(0.0, 1.0).unwrap();
+
+	let model = NNModel::with_unit_initializer(
+		NNUnits::new(8,(36,Box::new(FReLU::new())), (36,Box::new(FReLU::new())))
+			.add((4,Box::new(FSoftMax::new()))),
+		TextFileInputReader::new("data/initial_nn_8_36_36_4.txt").unwrap(),
+		move || {
+			n.sample(&mut rnd)
+		}).unwrap();
+	let mut nn = NN::new(model,|m| Adam::new(m),CrossEntropyMulticlass::new());
+
+	const FIZZBUZZ:[f64; 4] = [1f64,0f64,0f64,0f64];
+	const FIZZ:[f64; 4] = [0f64,1f64,0f64,0f64];
+	const BUZZ:[f64; 4] = [0f64,0f64,1f64,0f64];
+	const OTHER:[f64; 4] = [0f64,0f64,0f64,1f64];
+
+	for _ in 0..200 {
+		for v in 101..256 {
+			let i = bits_to_vec(v);
+
+			let answer = if v % 15 == 0 {
+				&FIZZBUZZ
+			} else if v % 3 == 0 {
+				&FIZZ
+			} else if v % 5 == 0 {
+				&BUZZ
+			} else {
+				&OTHER
+			};
+
+			let mut t = Vec::new();
+
+			t.extend(answer);
+			nn.learn(&i, &t).unwrap();
+		}
+	}
+
+	let nn = Quantization::quantization(&nn,UnitsConverter::conv_to_fxs16).unwrap();
+
+	for v in 101..111 {
+		let i = bits_to_vec_fx16(v);
+
+		let answer = if v % 15 == 0 {
+			0
+		} else if v % 3 == 0 {
+			1
+		} else if v % 5 == 0 {
+			2
+		} else {
+			3
+		};
+
+		let nnanswer = nn.solve(&i).unwrap();
+
+		assert_eq!(answer,nnanswer.iter().enumerate().fold((0,0f64.into()),|acc,t| {
+			if acc.1 < *t.1 {
+				(t.0,*t.1)
+			} else {
+				acc
+			}
+		}).0);
 	}
 }

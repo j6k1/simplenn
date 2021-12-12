@@ -49,7 +49,7 @@ impl Mul for FxS8 {
 
     #[inline]
     fn mul(self,other:FxS8) -> FxS8 {
-        ((self.raw * other.raw) >> 3).into()
+        ((((self.raw as i16) * (other.raw as i16)) >> 3) as i8).into()
     }
 }
 impl Div for FxS8 {
@@ -135,7 +135,7 @@ impl Mul for FxS16 {
 
     #[inline]
     fn mul(self,other:FxS16) -> FxS16 {
-        ((self.raw * other.raw) >> 7).into()
+        ((((self.raw as i32) * (other.raw as i32)) >> 7) as i16).into()
     }
 }
 impl Div for FxS16 {
