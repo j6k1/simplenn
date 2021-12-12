@@ -290,13 +290,13 @@ fn test_fizzbuzz() {
 	let mut rnd = XorShiftRng::from_seed(rnd.gen());
 	let n = Normal::new(0.0, 1.0).unwrap();
 
-	let model = NNModel::with_unit_initializer(
+	let model = NNModel::with_bias_and_unit_initializer(
 									NNUnits::new(8,(36,Box::new(FReLU::new())), (36,Box::new(FReLU::new())))
 										.add((4,Box::new(FSoftMax::new()))),
 									TextFileInputReader::new("data/initial_nn_8_36_36_4.txt").unwrap(),
 									move || {
 										n.sample(&mut rnd)
-									}).unwrap();
+									}, || 0f64).unwrap();
 	let mut nn = NN::new(model,|m| Adam::new(m),CrossEntropyMulticlass::new());
 
 	const FIZZBUZZ:[f64; 4] = [1f64,0f64,0f64,0f64];
@@ -899,13 +899,13 @@ fn test_fizzbuzz_quantization_16bit() {
 	let mut rnd = XorShiftRng::from_seed(rnd.gen());
 	let n = Normal::new(0.0, 1.0).unwrap();
 
-	let model = NNModel::with_unit_initializer(
+	let model = NNModel::with_bias_and_unit_initializer(
 		NNUnits::new(8,(36,Box::new(FReLU::new())), (36,Box::new(FReLU::new())))
 			.add((4,Box::new(FSoftMax::new()))),
 		TextFileInputReader::new("data/initial_nn_8_36_36_4.txt").unwrap(),
 		move || {
 			n.sample(&mut rnd)
-		}).unwrap();
+		}, || 0f64).unwrap();
 	let mut nn = NN::new(model,|m| Adam::new(m),CrossEntropyMulticlass::new());
 
 	const FIZZBUZZ:[f64; 4] = [1f64,0f64,0f64,0f64];
