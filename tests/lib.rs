@@ -45,7 +45,7 @@ fn bits_to_vec_fx16(value:u32) -> Vec<FxS16> {
 	let mut value = value;
 
 	while value > 0 {
-		v[index] = ((value << 3) as i16).into();
+		v[index] = (((value & 1) << 7) as i16).into();
 		value = value >> 1;
 		index += 1;
 	}
