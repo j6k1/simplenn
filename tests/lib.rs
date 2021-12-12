@@ -952,7 +952,7 @@ fn test_fizzbuzz_quantization() {
 		}
 	}
 
-	let nn = Quantization::quantization(&nn,UnitsConverter::conv_to_fxs8).unwrap();
+	let nn = Quantization::quantization(&nn,UnitsConverter::conv_to_fxs8);
 
 	for v in 101..111 {
 		let i = bits_to_vec_fx8(v);
@@ -1020,7 +1020,7 @@ fn test_fizzbuzz_quantization_16bit() {
 		}
 	}
 
-	let nn = Quantization::quantization(&nn,UnitsConverter::conv_to_fxs16).unwrap();
+	let nn = Quantization::quantization(&nn,UnitsConverter::conv_to_fxs16);
 
 	for v in 101..111 {
 		let i = bits_to_vec_fx16(v);
