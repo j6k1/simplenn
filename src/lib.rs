@@ -182,7 +182,8 @@ pub struct Quantization<O,E> {
 impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
 	pub fn quantization<T,R>(source:&NN<T,O,E>,
 							 units_converter:fn (units:&Vec<(usize,Option<Box<dyn ActivateF<T>>>)>)
-		-> Vec<(usize,Option<Box<dyn ActivateF<R>>>)>) -> NN<R,VoidOptimizer,VoidLossFunction>
+		-> Vec<(usize,Option<Box<dyn ActivateF<R>>>)>) ->
+																				   Result<NN<R,VoidOptimizer,VoidLossFunction>,InvalidStateError>
 		where T: UnitValue<T>,
 			  R: UnitValue<R> + From<T> {
 		let units = units_converter(&source.model.units);
@@ -209,7 +210,7 @@ impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
 		let mut rnd = rand::thread_rng();
 		let mut rnd = XorShiftRng::from_seed(rnd.gen());
 
-		NN {
+		Ok(NN {
 			model: Arc::new(NNModel {
 				units:units,
 				layers:layers,
@@ -217,7 +218,7 @@ impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
 			}),
 			optimizer:VoidOptimizer,
 			lossf:Arc::new(VoidLossFunction),
-		}
+		})
 	}
 }
 pub struct UnitsConverter;
