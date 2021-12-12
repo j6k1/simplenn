@@ -96,6 +96,12 @@ impl From<FxS8> for f64 {
         source.raw as f64 / 8.
     }
 }
+impl From<FxS8> for i8 {
+    #[inline]
+    fn from(source:FxS8) -> i8 {
+        source.raw
+    }
+}
 #[derive(Debug,Clone,Copy,PartialOrd, PartialEq,Ord,Eq)]
 pub struct FxS16 {
     raw:i16
@@ -188,6 +194,12 @@ impl From<i8> for FxS16 {
         FxS16 {
             raw: source as i16
         }
+    }
+}
+impl From<FxS16> for i16 {
+    #[inline]
+    fn from(source:FxS16) -> i16 {
+        source.raw
     }
 }
 pub trait Max {
