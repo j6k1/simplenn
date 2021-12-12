@@ -191,12 +191,12 @@ impl<T> FSoftMax<T> {
 		}
 	}
 }
-impl<T> ActivateF<T> for FSoftMax<T> where T: UnitValue<T> {
+impl<T> ActivateF<T> for FSoftMax<T> where T: UnitValue<T> + From<f64>, f64: From<T> {
 	#[inline]
 	fn apply(&self,u:T,v:&[T]) -> T {
 		let alpha = v.iter().fold(T::initial_max_value(), |m, &v| v.max(&m));
-		let numer = (u - alpha).exp();
-		numer / v.iter().fold(T::default(),|acc, &x| acc + (x - alpha).exp())
+		let numer = f64::from((u - alpha).exp());
+		(numer / v.iter().fold(0f64,|acc, &x| acc + f64::from((x - alpha).exp()))).into()
 	}
 
 	#[inline]
