@@ -1348,7 +1348,7 @@ impl<T> SnapShot<T> where T: Clone {
 	}
 }
 pub trait InputReader<E> where E: Error + fmt::Debug, StartupError<E>: From<E> {
-	fn read_vec(&mut self,usize,usize) -> Result<Vec<Vec<f64>>,E>;
+	fn read_vec(&mut self,units:usize,w:usize) -> Result<Vec<Vec<f64>>,E>;
 	fn source_exists(&mut self) -> bool;
 	fn verify_eof(&mut self) -> Result<(),E>;
 }

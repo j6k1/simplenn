@@ -293,7 +293,7 @@ pub trait One {
     fn one() -> Self;
 }
 pub trait Pow {
-    fn pow(&self,u32) -> Self;
+    fn pow(&self,exp:u32) -> Self;
 }
 pub trait Exp {
     fn exp(&self) -> Self;
