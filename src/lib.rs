@@ -478,8 +478,8 @@ impl NNModel<f64> where f64: UnitValue<f64> {
 		}
 
 		let mut layers:Vec<Vec<Vec<f64>>> = Vec::with_capacity(self.units.len()-1);
-		let mut d:Vec<f64> = Vec::with_capacity(self.units[self.units.len()-1].0 + 1);
-		d.resize(self.units[self.units.len()-1].0 + 1, 0f64);
+		let mut d:Vec<f64> = Vec::with_capacity(self.units[self.units.len()-1].0);
+		d.resize(self.units[self.units.len()-1].0, 0f64);
 
 		for l in 0..self.units.len() - 1 {
 			let mut layer:Vec<Vec<f64>> = Vec::with_capacity(self.units[l].0 + 1);
@@ -507,13 +507,13 @@ impl NNModel<f64> where f64: UnitValue<f64> {
 		let l = self.units.len()-1;
 		match lossf.is_canonical_link(&f) {
 			true => {
-				for k in 1..self.units[l].0 + 1 {
-					d[k] = s.r[k-1] - t[k-1];
+				for k in 0..self.units[l].0 {
+					d[k] = s.r[k] - t[k];
 				}
 			},
 			false => {
-				for k in 1..self.units[l].0 + 1 {
-					d[k] = (lossf.derive(s.r[k-1], t[k-1])) * f.derive(s.u[l][k]);
+				for k in 0..self.units[l].0 {
+					d[k] = (lossf.derive(s.r[k], t[k])) * f.derive(s.u[l][k]);
 				}
 			}
 		}
@@ -522,8 +522,8 @@ impl NNModel<f64> where f64: UnitValue<f64> {
 			let o = s.o[hl][i];
 			let mut e:Vec<f64> = Vec::with_capacity(self.units[l].0);
 			e.resize(self.units[l].0,0f64);
-			for j in 1..self.units[l].0 + 1 {
-				e[j-1] = d[j] * o;
+			for j in 0..self.units[l].0 {
+				e[j] = d[j] * o;
 			}
 			optimizer.update(hl,i,&e,&self.layers[hl][i],&mut layers[hl][i]);
 		}
@@ -544,22 +544,22 @@ impl NNModel<f64> where f64: UnitValue<f64> {
 				li.resize(self.units[l].0,0f64);
 			}
 
-			let mut nd:Vec<f64> = Vec::with_capacity(self.units[l].0 + 1);
-			nd.resize(self.units[l].0 + 1, 0f64);
+			let mut nd:Vec<f64> = Vec::with_capacity(self.units[l].0);
+			nd.resize(self.units[l].0, 0f64);
 
-			for j in 1..self.units[l].0 + 1{
-				for k in 1..self.units[ll].0 + 1 {
-					nd[j] += self.layers[l][j][k-1] * d[k];
+			for j in 1..self.units[l].0 + 1 {
+				for k in 0..self.units[ll].0 {
+					nd[j-1] += self.layers[l][j][k] * d[k];
 				}
-				nd[j] = nd[j] * f.derive(s.u[l][j]);
+				nd[j-1] = nd[j-1] * f.derive(s.u[l][j-1]);
 			}
 
 			for i in 0..self.units[hl].0 + 1 {
 				let o = s.o[hl][i];
 				let mut e:Vec<f64> = Vec::with_capacity(self.units[l].0);
 				e.resize(self.units[l].0,0f64);
-				for j in 1..self.units[l].0 + 1 {
-					e[j-1] = nd[j] * o;
+				for j in 0..self.units[l].0 {
+					e[j] = nd[j] * o;
 				}
 				optimizer.update(hl,i,&e,&self.layers[hl][i],&mut layers[hl][i]);
 			}
@@ -614,8 +614,8 @@ impl NNModel<f64> where f64: UnitValue<f64> {
 				metrics.error_total += lossf.apply(s.r[k-1],t[k-1]);
 			}
 
-			let mut d:Vec<f64> = Vec::with_capacity(self.units[self.units.len()-1].0 + 1);
-			d.resize(self.units[self.units.len()-1].0 + 1, 0f64);
+			let mut d:Vec<f64> = Vec::with_capacity(self.units[self.units.len()-1].0);
+			d.resize(self.units[self.units.len()-1].0, 0f64);
 
 			let f:&Box<dyn ActivateF<f64>> = match self.units[self.units.len()-1].1 {
 				Some(ref f) => f,
@@ -630,21 +630,21 @@ impl NNModel<f64> where f64: UnitValue<f64> {
 			let l = self.units.len()-1;
 			match lossf.is_canonical_link(&f) {
 				true => {
-					for k in 1..self.units[l].0 + 1 {
-						d[k] = s.r[k-1] - t[k-1];
+					for k in 0..self.units[l].0 {
+						d[k] = s.r[k] - t[k];
 					}
 				},
 				false => {
-					for k in 1..self.units[l].0 + 1 {
-						d[k] = (lossf.derive(s.r[k-1], t[k-1])) * f.derive(s.u[l][k]);
+					for k in 0..self.units[l].0 {
+						d[k] = (lossf.derive(s.r[k], t[k])) * f.derive(s.u[l][k]);
 					}
 				}
 			}
 
 			for i in 0..self.units[hl].0 + 1 {
 				let o = s.o[hl][i];
-				for j in 1..self.units[l].0 + 1 {
-					de_dw_total[hl][i][j-1] += d[j] * o;
+				for j in 0..self.units[l].0 {
+					de_dw_total[hl][i][j] += d[j] * o;
 				}
 			}
 
@@ -660,20 +660,20 @@ impl NNModel<f64> where f64: UnitValue<f64> {
 					}
 				};
 
-				let mut nd:Vec<f64> = Vec::with_capacity(self.units[l].0 + 1);
-				nd.resize(self.units[l].0 + 1, 0f64);
+				let mut nd:Vec<f64> = Vec::with_capacity(self.units[l].0);
+				nd.resize(self.units[l].0, 0f64);
 
 				for j in 1..self.units[l].0 + 1{
-					for k in 1..self.units[ll].0 + 1 {
-						nd[j] += self.layers[l][j][k-1] * d[k];
+					for k in 0..self.units[ll].0 {
+						nd[j-1] += self.layers[l][j][k] * d[k];
 					}
-					nd[j] = nd[j] * f.derive(s.u[l][j]);
+					nd[j-1] = nd[j-1] * f.derive(s.u[l][j-1]);
 				}
 
 				for i in 0..self.units[hl].0 + 1 {
 					let o = s.o[hl][i];
-					for j in 1..self.units[l].0 + 1 {
-						de_dw_total[hl][i][j-1] += nd[j] * o;
+					for j in 0..self.units[l].0 {
+						de_dw_total[hl][i][j] += nd[j] * o;
 					}
 				}
 
@@ -822,8 +822,8 @@ impl NNModel<f64> where f64: UnitValue<f64> {
 								metrics.error_total += lossf.apply(s.r[k - 1], t[k - 1]);
 							}
 
-							let mut d: Vec<f64> = Vec::with_capacity(this.units[this.units.len() - 1].0 + 1);
-							d.resize(this.units[this.units.len() - 1].0 + 1, 0f64);
+							let mut d: Vec<f64> = Vec::with_capacity(this.units[this.units.len() - 1].0);
+							d.resize(this.units[this.units.len() - 1].0, 0f64);
 
 							let f: &Box<dyn ActivateF<f64>> = match this.units[this.units.len() - 1].1 {
 								Some(ref f) => f,
@@ -838,21 +838,21 @@ impl NNModel<f64> where f64: UnitValue<f64> {
 							let l = this.units.len() - 1;
 							match lossf.is_canonical_link(&f) {
 								true => {
-									for k in 1..this.units[l].0 + 1 {
-										d[k] = s.r[k - 1] - t[k - 1];
+									for k in 0..this.units[l].0 {
+										d[k] = s.r[k] - t[k];
 									}
 								},
 								false => {
-									for k in 1..this.units[l].0 + 1 {
-										d[k] = (lossf.derive(s.r[k - 1], t[k - 1])) * f.derive(s.u[l][k]);
+									for k in 0..this.units[l].0 {
+										d[k] = (lossf.derive(s.r[k], t[k])) * f.derive(s.u[l][k]);
 									}
 								}
 							}
 
 							for i in 0..this.units[hl].0 + 1 {
 								let o = s.o[hl][i];
-								for j in 1..this.units[l].0 + 1 {
-									de_dw_total[hl][i][j - 1] += d[j] * o;
+								for j in 0..this.units[l].0 {
+									de_dw_total[hl][i][j] += d[j] * o;
 								}
 							}
 
@@ -868,20 +868,20 @@ impl NNModel<f64> where f64: UnitValue<f64> {
 									}
 								};
 
-								let mut nd: Vec<f64> = Vec::with_capacity(this.units[l].0 + 1);
-								nd.resize(this.units[l].0 + 1, 0f64);
+								let mut nd: Vec<f64> = Vec::with_capacity(this.units[l].0);
+								nd.resize(this.units[l].0, 0f64);
 
 								for j in 1..this.units[l].0 + 1 {
-									for k in 1..this.units[ll].0 + 1 {
-										nd[j] += this.layers[l][j][k - 1] * d[k];
+									for k in 0..this.units[ll].0 {
+										nd[j-1] += this.layers[l][j][k] * d[k];
 									}
-									nd[j] = nd[j] * f.derive(s.u[l][j]);
+									nd[j-1] = nd[j-1] * f.derive(s.u[l][j-1]);
 								}
 
 								for i in 0..this.units[hl].0 + 1 {
 									let o = s.o[hl][i];
-									for j in 1..this.units[l].0 + 1 {
-										de_dw_total[hl][i][j - 1] += nd[j] * o;
+									for j in 0..this.units[l].0 {
+										de_dw_total[hl][i][j] += nd[j] * o;
 									}
 								}
 
@@ -1055,13 +1055,12 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 
 		o.push(oi);
 
-		u.push(Vec::with_capacity(self.units[1].0 + 1));
+		u.push(Vec::with_capacity(self.units[1].0));
 
-		u[1].resize_with(self.units[1].0 + 1, Default::default);
+		u[1].resize_with(self.units[1].0, Default::default);
 
 		for (&o,wl) in o[0].iter().zip(&self.layers[0]) {
-			// インデックス0はバイアスのユニットなので一つ右にずらす
-			for (u,&w) in u[1].iter_mut().skip(1).zip(wl) {
+			for (u,&w) in u[1].iter_mut().zip(wl) {
 				*u += o * w;
 			}
 		}
@@ -1089,7 +1088,7 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 
 		for &(i,d) in input {
 			// インデックス0はバイアスのユニットなので一つ右にずらす
-			for (u,&w) in ui.iter_mut().skip(1).zip(&self.layers[0][i+1]) {
+			for (u,&w) in ui.iter_mut().zip(&self.layers[0][i+1]) {
 				*u += d * w;
 			}
 		}
@@ -1116,14 +1115,14 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 		o[1][0] = T::bias();
 
 		// インデックス0はバイアスのユニットなので一つ右にずらす
-		for (oi,&ui) in o[1].iter_mut().skip(1).zip(u[1].iter().skip(1)) {
+		for (oi,&ui) in o[1].iter_mut().skip(1).zip(u[1].iter()) {
 			*oi = f.apply(ui,&u[1]);
 		}
 
 		for l in 1..self.units.len() - 1 {
 			let ll = l + 1;
-			let mut ul:Vec<T> = Vec::with_capacity(self.units[ll].0 + 1);
-			ul.resize_with(self.units[ll].0 + 1, Default::default);
+			let mut ul:Vec<T> = Vec::with_capacity(self.units[ll].0);
+			ul.resize_with(self.units[ll].0, Default::default);
 			u.push(ul);
 			let f:&Box<dyn ActivateF<T>> = match self.units[ll].1 {
 				Some(ref f) => f,
@@ -1141,8 +1140,7 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 			o[ll][0] = T::bias();
 
 			for (&o,wl) in o[l].iter().zip(&self.layers[l]) {
-				// インデックス0はバイアスのユニットなので一つ右にずらす
-				for (u,&w) in u[ll].iter_mut().skip(1).zip(wl) {
+				for (u,&w) in u[ll].iter_mut().zip(wl) {
 					*u = *u + o * w;
 				}
 			}
@@ -1150,7 +1148,7 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 			let u = &u[ll];
 
 			// インデックス0はバイアスのユニットなので一つ右にずらす
-			for (o,ui) in o[ll].iter_mut().skip(1).zip(u.iter().skip(1)) {
+			for (o,ui) in o[ll].iter_mut().skip(1).zip(u.iter()) {
 				*o = f.apply(*ui,u);
 			}
 		}
@@ -1198,8 +1196,7 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 			for i in (0..wl.len()).step_by(16) {
 				for j in 0..16 {
 					unsafe {
-						// インデックス0はバイアスのユニットなので一つ右にずらす
-						*u.get_unchecked_mut(i + j + 1) += o * (*wl.get_unchecked(i + j));
+						*u.get_unchecked_mut(i + j) += o * (*wl.get_unchecked(i + j));
 					}
 				}
 			}
@@ -1227,8 +1224,7 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 		let mut ui = s.u[1].clone();
 
 		for &(i,d) in input {
-			// インデックス0はバイアスのユニットなので一つ右にずらす
-			for (u,&w) in ui.iter_mut().skip(1).zip(&self.layers[0][i+1]) {
+			for (u,&w) in ui.iter_mut().zip(&self.layers[0][i+1]) {
 				*u += d * w;
 			}
 		}
@@ -1256,9 +1252,7 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 
 		for (oi,&ui) in o[1].iter_mut()
 										.skip(1)
-										.zip(u[1].iter()
-													.skip(1)
-													.take(self.units[1].0)) {
+										.zip(u[1].iter().take(self.units[1].0)) {
 			*oi = f.apply(ui,&u[1]);
 		}
 
@@ -1291,8 +1285,7 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 				for i in (0..wl.len()).step_by(16) {
 					for j in 0..16 {
 						unsafe {
-							// インデックス0はバイアスのユニットなので一つ右にずらす
-							*u.get_unchecked_mut(i + j + 1) += o * (*wl.get_unchecked(i + j));
+							*u.get_unchecked_mut(i + j) += o * (*wl.get_unchecked(i + j));
 						}
 					}
 				}
@@ -1302,9 +1295,7 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 
 			for (o,ui) in o[ll].iter_mut()
 												.skip(1)
-												.zip(u.iter()
-													.skip(1)
-													.take(self.units[ll].0)) {
+												.zip(u.iter().take(self.units[ll].0)) {
 				// インデックス0はバイアスのユニットなので一つ右にずらす
 				*o = f.apply(*ui,u);
 			}
