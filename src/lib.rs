@@ -1187,7 +1187,11 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 
 		o.push(oi);
 
-		let unit_len =(self.units[1].0 / 16 + 1) * 16 + 1;
+		let unit_len = if self.units[1].0 % 16 == 0 {
+			self.units[1].0
+		} else {
+			self.units[1].0 + (16 - (self.units[1].0 % 16))
+		};
 
 		u.push(Vec::with_capacity(unit_len));
 
@@ -1262,7 +1266,11 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 		for l in 1..self.units.len() - 1 {
 			let ll = l + 1;
 
-			let unit_len = (self.units[ll].0 / 16 + 1) * 16 + 1;
+			let unit_len = if self.units[ll].0 % 16 == 0 {
+				self.units[ll].0
+			} else {
+				self.units[ll].0 + (16 - (self.units[ll].0 % 16))
+			};
 
 			let mut ul:Vec<T> = Vec::with_capacity(unit_len);
 			ul.resize_with(unit_len, Default::default);
