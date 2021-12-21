@@ -609,10 +609,8 @@ impl NNModel<f64> where f64: UnitValue<f64> {
 		for (input,t) in it {
 			let s = self.promise_of_learn(&input)?;
 
-			let l = self.units.len()-1;
-
-			for k in 1..self.units[l].0 + 1 {
-				metrics.error_total += lossf.apply(s.r[k-1],t[k-1]);
+			for (&r,&t) in s.r.iter().zip(t.iter()) {
+				metrics.error_total += lossf.apply(r,t);
 			}
 
 			let mut d:Vec<f64> = Vec::with_capacity(self.units[self.units.len()-1].0);
