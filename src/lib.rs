@@ -201,7 +201,7 @@ impl<O,E> Quantization<O,E> where O: Optimizer, E: LossFunction {
 					layers[i][j].push((source.model.layers[i][j][k]).into())
 				}
 
-				while layers[i][j].len() % 16 != 0 {
+				while layers[i][j].len() % R::vunit() != 0 {
 					layers[i][j].push(R::default());
 				}
 			}
@@ -1185,10 +1185,10 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 
 		o.push(oi);
 
-		let unit_len = if self.units[1].0 % 16 == 0 {
+		let unit_len = if self.units[1].0 % T::vunit() == 0 {
 			self.units[1].0
 		} else {
-			self.units[1].0 + (16 - (self.units[1].0 % 16))
+			self.units[1].0 + (T::vunit() - (self.units[1].0 % T::vunit()))
 		};
 
 		u.push(Vec::with_capacity(unit_len));
@@ -1198,8 +1198,8 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 		for (&o,wl) in o[0].iter().zip(&self.layers[0]) {
 			let u = &mut u[1];
 
-			for i in (0..wl.len()).step_by(16) {
-				for j in 0..16 {
+			for i in (0..wl.len()).step_by(T::vunit()) {
+				for j in 0..T::vunit() {
 					unsafe {
 						*u.get_unchecked_mut(i + j) += o * (*wl.get_unchecked(i + j));
 					}
@@ -1264,10 +1264,10 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 		for l in 1..self.units.len() - 1 {
 			let ll = l + 1;
 
-			let unit_len = if self.units[ll].0 % 16 == 0 {
+			let unit_len = if self.units[ll].0 % T::vunit() == 0 {
 				self.units[ll].0
 			} else {
-				self.units[ll].0 + (16 - (self.units[ll].0 % 16))
+				self.units[ll].0 + (T::vunit() - (self.units[ll].0 % T::vunit()))
 			};
 
 			let mut ul:Vec<T> = Vec::with_capacity(unit_len);
@@ -1291,8 +1291,8 @@ impl<T> NNModel<T> where T: UnitValue<T> {
 			for (&o,wl) in o[l].iter().zip(&self.layers[l]) {
 				let u = &mut u[ll];
 
-				for i in (0..wl.len()).step_by(16) {
-					for j in 0..16 {
+				for i in (0..wl.len()).step_by(T::vunit()) {
+					for j in 0..T::vunit() {
 						unsafe {
 							*u.get_unchecked_mut(i + j) += o * (*wl.get_unchecked(i + j));
 						}

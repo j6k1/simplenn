@@ -4,10 +4,38 @@ use std::fmt;
 use Bias;
 use std::fmt::Debug;
 
+const CHAR_VUNIT:usize = if cfg!(target_feature = "avx2") {
+    16
+} else if cfg!(target_feature = "avx") {
+    16
+} else if cfg!(target_feature = "sse2") {
+    8
+} else {
+    1
+};
+const SHORT_VUNIT:usize = if cfg!(target_feature = "avx2") {
+    16
+} else if cfg!(target_feature = "avx") {
+    16
+} else if cfg!(target_feature = "sse2") {
+    8
+} else {
+    1
+};
+const DOUBLE_VUNIT:usize = if cfg!(target_feature = "avx2") {
+    8
+} else if cfg!(target_feature = "avx") {
+    8
+} else if cfg!(target_feature = "sse2") {
+    4
+} else {
+    1
+};
+
 pub trait UnitValue<T>: Add<Output=T> + Sub<Output=T> + Mul<Output=T> + Div<Output=T> + Neg<Output=T> +
                         AddAssign + PartialOrd +
                         Clone + Copy + Default + Debug + From<i8> + Send + Sync + 'static +
-                        Exp + Tanh + One + Max + Min + MaxValue + InitialMaxValue + Abs + Bias {
+                        Exp + Tanh + One + Max + Min + MaxValue + InitialMaxValue + Abs + Bias + VUnit {
 
 }
 #[derive(Debug,Clone,Copy,PartialOrd, PartialEq,Ord,Eq)]
@@ -401,6 +429,27 @@ impl Abs for FxS16 {
         } else {
             *self
         }
+    }
+}
+pub trait VUnit {
+    fn vunit() -> usize;
+}
+impl VUnit for f64 {
+    #[inline]
+    fn vunit() -> usize {
+        DOUBLE_VUNIT
+    }
+}
+impl VUnit for FxS8 {
+    #[inline]
+    fn vunit() -> usize {
+        CHAR_VUNIT
+    }
+}
+impl VUnit for FxS16 {
+    #[inline]
+    fn vunit() -> usize {
+        SHORT_VUNIT
     }
 }
 impl UnitValue<f64> for f64 {}
