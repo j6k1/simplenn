@@ -23,11 +23,11 @@ const SHORT_VUNIT:usize = if cfg!(target_feature = "avx2") {
     1
 };
 const DOUBLE_VUNIT:usize = if cfg!(target_feature = "avx2") {
-    8
-} else if cfg!(target_feature = "avx") {
-    8
-} else if cfg!(target_feature = "sse2") {
     4
+} else if cfg!(target_feature = "avx") {
+    4
+} else if cfg!(target_feature = "sse2") {
+    2
 } else {
     1
 };
