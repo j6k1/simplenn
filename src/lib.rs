@@ -507,30 +507,30 @@ impl NNModel<f64> where f64: UnitValue<f64> {
 		let l = self.units.len()-1;
 		match lossf.is_canonical_link(&f) {
 			true => {
-				for k in 0..self.units[l].0 {
-					d[k] = s.r[k] - t[k];
+				for (d,(&r,&t)) in d.iter_mut().zip(s.r.iter().zip(t.iter())) {
+					*d = r - t;
 				}
 			},
 			false => {
-				for k in 0..self.units[l].0 {
-					d[k] = (lossf.derive(s.r[k], t[k])) * f.derive(s.u[l][k]);
+				for ((d,(&r,&t)),&u) in d.iter_mut().zip(
+															s.r.iter().zip(t.iter()))
+																	.zip(s.u[l].iter()) {
+					*d = (lossf.derive(r, t)) * f.derive(u);
 				}
 			}
 		}
 
-		for i in 0..self.units[hl].0 + 1 {
-			let o = s.o[hl][i];
+		for (i,&o) in (0..self.units[hl].0 + 1).zip(s.o[hl].iter()) {
 			let mut e:Vec<f64> = Vec::with_capacity(self.units[l].0);
 			e.resize(self.units[l].0,0f64);
-			for j in 0..self.units[l].0 {
-				e[j] = d[j] * o;
+			for (e,&d) in e.iter_mut().zip(d.iter()) {
+				*e = d * o;
 			}
 			optimizer.update(hl,i,&e,&self.layers[hl][i],&mut layers[hl][i]);
 		}
 
 		for l in (1..self.units.len()-1).rev() {
 			let hl = l - 1;
-			let ll = l + 1;
 			let f:&Box<dyn ActivateF<f64>> = match self.units[l].1 {
 				Some(ref f) => f,
 				None => {
@@ -547,19 +547,20 @@ impl NNModel<f64> where f64: UnitValue<f64> {
 			let mut nd:Vec<f64> = Vec::with_capacity(self.units[l].0);
 			nd.resize(self.units[l].0, 0f64);
 
-			for j in 1..self.units[l].0 + 1 {
-				for k in 0..self.units[ll].0 {
-					nd[j-1] += self.layers[l][j][k] * d[k];
+			for ((wl,&u),nd) in self.layers[l].iter()
+															.skip(1).zip(s.u[l].iter())
+															.zip(nd.iter_mut()) {
+				for (w,d) in wl.iter().zip(d.iter()) {
+					*nd += w * d;
 				}
-				nd[j-1] = nd[j-1] * f.derive(s.u[l][j-1]);
+				*nd = *nd * f.derive(u);
 			}
 
-			for i in 0..self.units[hl].0 + 1 {
-				let o = s.o[hl][i];
+			for (i,&o) in (0..self.units[hl].0 + 1).zip(s.o[hl].iter()) {
 				let mut e:Vec<f64> = Vec::with_capacity(self.units[l].0);
 				e.resize(self.units[l].0,0f64);
-				for j in 0..self.units[l].0 {
-					e[j] = nd[j] * o;
+				for (e,&nd) in e.iter_mut().zip(nd.iter()) {
+					*e = nd * o;
 				}
 				optimizer.update(hl,i,&e,&self.layers[hl][i],&mut layers[hl][i]);
 			}
@@ -630,27 +631,27 @@ impl NNModel<f64> where f64: UnitValue<f64> {
 			let l = self.units.len()-1;
 			match lossf.is_canonical_link(&f) {
 				true => {
-					for k in 0..self.units[l].0 {
-						d[k] = s.r[k] - t[k];
+					for (d,(&r,&t)) in d.iter_mut().zip(s.r.iter().zip(t.iter())) {
+						*d = r - t;
 					}
 				},
 				false => {
-					for k in 0..self.units[l].0 {
-						d[k] = (lossf.derive(s.r[k], t[k])) * f.derive(s.u[l][k]);
+					for ((d,(&r,&t)),&u) in d.iter_mut().zip(
+																s.r.iter().zip(t.iter()))
+																.zip(s.u[l].iter()) {
+						*d = (lossf.derive(r, t)) * f.derive(u);
 					}
 				}
 			}
 
-			for i in 0..self.units[hl].0 + 1 {
-				let o = s.o[hl][i];
-				for j in 0..self.units[l].0 {
-					de_dw_total[hl][i][j] += d[j] * o;
+			for (dt,&o) in de_dw_total[hl].iter_mut().zip(s.o[hl].iter()) {
+				for (dt,&d) in dt.iter_mut().zip(d.iter()) {
+					*dt += d * o;
 				}
 			}
 
 			for l in (1..self.units.len()-1).rev() {
 				let hl = l - 1;
-				let ll = l + 1;
 				let f:&Box<dyn ActivateF<f64>> = match self.units[l].1 {
 					Some(ref f) => f,
 					None => {
@@ -663,17 +664,19 @@ impl NNModel<f64> where f64: UnitValue<f64> {
 				let mut nd:Vec<f64> = Vec::with_capacity(self.units[l].0);
 				nd.resize(self.units[l].0, 0f64);
 
-				for j in 1..self.units[l].0 + 1{
-					for k in 0..self.units[ll].0 {
-						nd[j-1] += self.layers[l][j][k] * d[k];
+				for ((wl,&u),nd) in self.layers[l].iter()
+																.skip(1)
+																.zip(s.u[l].iter())
+																.zip(nd.iter_mut()) {
+					for (&w,&d) in wl.iter().zip(d.iter()) {
+						*nd += w * d;
 					}
-					nd[j-1] = nd[j-1] * f.derive(s.u[l][j-1]);
+					*nd = *nd * f.derive(u);
 				}
 
-				for i in 0..self.units[hl].0 + 1 {
-					let o = s.o[hl][i];
-					for j in 0..self.units[l].0 {
-						de_dw_total[hl][i][j] += nd[j] * o;
+				for (dt,&o) in de_dw_total[hl].iter_mut().zip(s.o[hl].iter()) {
+					for (dt,&nd) in dt.iter_mut().zip(nd.iter()) {
+						*dt += nd * o;
 					}
 				}
 
@@ -816,10 +819,8 @@ impl NNModel<f64> where f64: UnitValue<f64> {
 								Ok(SnapShot::new(r, o, u, None))
 							})?;
 
-							let l = this.units.len() - 1;
-
-							for k in 1..this.units[l].0 + 1 {
-								metrics.error_total += lossf.apply(s.r[k - 1], t[k - 1]);
+							for (&r,&t) in s.r.iter().zip(t.iter()) {
+								metrics.error_total += lossf.apply(r, t);
 							}
 
 							let mut d: Vec<f64> = Vec::with_capacity(this.units[this.units.len() - 1].0);
@@ -838,27 +839,27 @@ impl NNModel<f64> where f64: UnitValue<f64> {
 							let l = this.units.len() - 1;
 							match lossf.is_canonical_link(&f) {
 								true => {
-									for k in 0..this.units[l].0 {
-										d[k] = s.r[k] - t[k];
+									for (d,(&r,&t)) in d.iter_mut().zip(s.r.iter().zip(t.iter())) {
+										*d = r - t;
 									}
 								},
 								false => {
-									for k in 0..this.units[l].0 {
-										d[k] = (lossf.derive(s.r[k], t[k])) * f.derive(s.u[l][k]);
+									for ((d,(&r,&t)),&u) in d.iter_mut().zip(
+																				s.r.iter().zip(t.iter()))
+																				.zip(s.u[l].iter()) {
+										*d = (lossf.derive(r, t)) * f.derive(u);
 									}
 								}
 							}
 
-							for i in 0..this.units[hl].0 + 1 {
-								let o = s.o[hl][i];
-								for j in 0..this.units[l].0 {
-									de_dw_total[hl][i][j] += d[j] * o;
+							for (dt,&o) in de_dw_total[hl].iter_mut().zip(s.o[hl].iter()) {
+								for (dt,&d) in dt.iter_mut().zip(d.iter()) {
+									*dt += d * o;
 								}
 							}
 
 							for l in (1..this.units.len() - 1).rev() {
 								let hl = l - 1;
-								let ll = l + 1;
 								let f: &Box<dyn ActivateF<f64>> = match this.units[l].1 {
 									Some(ref f) => f,
 									None => {
@@ -871,17 +872,19 @@ impl NNModel<f64> where f64: UnitValue<f64> {
 								let mut nd: Vec<f64> = Vec::with_capacity(this.units[l].0);
 								nd.resize(this.units[l].0, 0f64);
 
-								for j in 1..this.units[l].0 + 1 {
-									for k in 0..this.units[ll].0 {
-										nd[j-1] += this.layers[l][j][k] * d[k];
+								for ((wl,&u),nd) in this.layers[l].iter()
+																						.skip(1)
+																						.zip(s.u[l].iter())
+																						.zip(nd.iter_mut()) {
+									for (&w,&d) in wl.iter().zip(d.iter()) {
+										*nd += w * d;
 									}
-									nd[j-1] = nd[j-1] * f.derive(s.u[l][j-1]);
+									*nd = *nd * f.derive(u);
 								}
 
-								for i in 0..this.units[hl].0 + 1 {
-									let o = s.o[hl][i];
-									for j in 0..this.units[l].0 {
-										de_dw_total[hl][i][j] += nd[j] * o;
+								for (dt,&o) in de_dw_total[hl].iter_mut().zip(s.o[hl].iter()) {
+									for (dt,&nd) in dt.iter_mut().zip(nd.iter()) {
+										*dt += nd * o;
 									}
 								}
 
