@@ -141,6 +141,46 @@ impl<T> AsActivateF<FxS16> for FReLU<T> where T: Send + Sync + 'static {
 	}
 }
 #[derive(Clone)]
+pub struct FSwish<T> {
+	t:PhantomData::<T>
+}
+impl<T> FSwish<T> {
+	pub fn new() -> FSwish<T> {
+		FSwish {
+			t:PhantomData::<T>
+		}
+	}
+}
+impl<T> ActivateF<T> for FSwish<T> where T: UnitValue<T> {
+	#[inline]
+	fn apply(&self,u:T,_:&[T]) -> T {
+		u * (T::one() / (T::one() + (-u).exp()))
+	}
+
+	#[inline]
+	fn derive(&self,e:T) -> T {
+		e * (T::one() / (T::one() + (-e).exp())) +
+		(T::one() / (T::one() + (-e).exp())) * (T::one() - (e * (T::one() / (T::one() + (-e).exp()))))
+	}
+
+	#[inline]
+	fn kind(&self) -> &str {
+		"swish"
+	}
+}
+impl<T> AsActivateF<FxS8> for FSwish<T> where T: Send + Sync + 'static {
+	#[inline]
+	fn as_activate_function(&self) -> Box<dyn ActivateF<FxS8>> {
+		Box::new(FSwish::new())
+	}
+}
+impl<T> AsActivateF<FxS16> for FSwish<T> where T: Send + Sync + 'static {
+	#[inline]
+	fn as_activate_function(&self) -> Box<dyn ActivateF<FxS16>> {
+		Box::new(FSwish::new())
+	}
+}
+#[derive(Clone)]
 pub struct FTanh<T> {
 	t:PhantomData::<T>
 }
