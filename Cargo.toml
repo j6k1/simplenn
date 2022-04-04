@@ -7,3 +7,5 @@ authors = ["jinpu"]
 rand = "0.5"
 rand_xorshift = "0.1.1"
 statrs = "0.10.0"
+[profile.test]
+opt-level = 3
